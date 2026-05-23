@@ -131,6 +131,17 @@ select:focus-visible {
   color: var(--warning);
 }
 
+.refresh-link {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+}
+
+.refresh-link:hover {
+  color: var(--text);
+}
+
 .toolbar {
   align-items: center;
   display: flex;

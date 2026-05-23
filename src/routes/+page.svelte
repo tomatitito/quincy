@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { invalidateAll } from "$app/navigation";
   import AppHeader from "$lib/components/AppHeader.svelte";
   import KanbanBoard from "$lib/components/KanbanBoard.svelte";
 
@@ -8,6 +9,10 @@
   const openCount = $derived(tickets.filter((ticket) => ticket.status === "open").length);
   const closedCount = $derived(tickets.filter((ticket) => ticket.status === "closed").length);
   const readyCount = $derived(tickets.filter((ticket) => ticket.ready).length);
+
+  function refreshTickets() {
+    void invalidateAll();
+  }
 </script>
 
 <svelte:head>
@@ -15,7 +20,7 @@
 </svelte:head>
 
 <div class="app-shell">
-  <AppHeader />
+  <AppHeader onRefresh={refreshTickets} />
 
   <section class="tabs" aria-label="Workspace summary">
     <nav class="tabs-nav" aria-label="Views">
