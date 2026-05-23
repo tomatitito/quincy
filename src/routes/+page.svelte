@@ -1,6 +1,13 @@
 <script lang="ts">
   import AppHeader from "$lib/components/AppHeader.svelte";
   import KanbanBoard from "$lib/components/KanbanBoard.svelte";
+
+  let { data } = $props();
+
+  const tickets = $derived(data.kanban.columns.flatMap((column) => column.tickets));
+  const openCount = $derived(tickets.filter((ticket) => ticket.status === "open").length);
+  const closedCount = $derived(tickets.filter((ticket) => ticket.status === "closed").length);
+  const readyCount = $derived(tickets.filter((ticket) => ticket.ready).length);
 </script>
 
 <svelte:head>
@@ -17,15 +24,15 @@
       <button type="button">Details</button>
     </nav>
     <div class="stats-row">
-      <span>Total: 3</span>
-      <span>Open: 2</span>
-      <span>Closed: 1</span>
-      <span>Ready: 1</span>
+      <span>Total: {tickets.length}</span>
+      <span>Open: {openCount}</span>
+      <span>Closed: {closedCount}</span>
+      <span>Ready: {readyCount}</span>
       <span>Critical path: 0 edges</span>
     </div>
   </section>
 
   <main class="content">
-    <KanbanBoard />
+    <KanbanBoard columns={data.kanban.columns} />
   </main>
 </div>
