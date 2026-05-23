@@ -1,17 +1,23 @@
+export type TicketId = string;
+export type TicketTitle = string;
 export type TicketStatus = "open" | "in_progress" | "closed";
+export type TicketPriority = number;
+export type TicketType = string;
+export type DependencyId = string;
+export type TicketReadiness = boolean;
 export type KanbanColumnId = "backlog" | TicketStatus;
 
 export interface Ticket {
-  id: string;
-  title: string;
+  id: TicketId;
+  title: TicketTitle;
   status: TicketStatus;
-  priority: number;
-  type: string;
-  deps: string[];
+  priority: TicketPriority;
+  type: TicketType;
+  deps: DependencyId[];
 }
 
 export interface TicketView extends Ticket {
-  ready: boolean;
+  ready: TicketReadiness;
 }
 
 export interface KanbanColumn {
@@ -31,10 +37,10 @@ function columnIdForTicket(ticket: TicketView): KanbanColumnId {
   return ticket.status;
 }
 
-function isReady(ticket: Ticket, tickets: Ticket[]): boolean {
+function isReady(ticket: Ticket, tickets: Ticket[]): TicketReadiness {
   return ticket.status !== "closed" && ticket.deps.every((dependencyId) => isClosedDependency(dependencyId, tickets));
 }
 
-function isClosedDependency(dependencyId: string, tickets: Ticket[]): boolean {
+function isClosedDependency(dependencyId: DependencyId, tickets: Ticket[]): TicketReadiness {
   return tickets.some((ticket) => ticket.id === dependencyId && ticket.status === "closed");
 }

@@ -1,6 +1,6 @@
 ---
 id: qui-oec9
-status: open
+status: in_progress
 deps: []
 links: []
 created: 2026-05-23T22:33:20Z
