@@ -1,6 +1,6 @@
 ---
 id: qui-367i
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-05-23T21:56:26Z
