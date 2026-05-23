@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+command="${1:-run}"
+if [[ $# -gt 0 ]]; then
+  shift
+fi
+
+case "$command" in
+  run)
+    if [[ $# -eq 0 && ! -d src ]]; then
+      echo "Static sensors skipped: no src directory yet."
+      exit 0
+    fi
+
+    bunx eslint --config .sensors/eslint.config.mjs "${@:-src}"
+    ;;
+  *)
+    echo "Usage: .sensors/sensors run [eslint-targets...]" >&2
+    exit 2
+    ;;
+esac

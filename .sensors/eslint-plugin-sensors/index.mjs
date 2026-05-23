@@ -1,0 +1,19 @@
+import maxFileLines from "./rules/max-file-lines.mjs";
+import maxFunctionLines from "./rules/max-function-lines.mjs";
+import mutatedParamMustBeReturned from "./rules/mutated-param-must-be-returned.mjs";
+import noClasses from "./rules/no-classes.mjs";
+import noLocalTypeAlias from "./rules/no-local-type-alias.mjs";
+import noSideEffectsInMap from "./rules/no-side-effects-in-map.mjs";
+import noVoidReturnFunctions from "./rules/no-void-return-functions.mjs";
+
+export default {
+  rules: {
+    "max-file-lines": maxFileLines,
+    "max-function-lines": maxFunctionLines,
+    "mutated-param-must-be-returned": mutatedParamMustBeReturned,
+    "no-classes": noClasses,
+    "no-local-type-alias": noLocalTypeAlias,
+    "no-side-effects-in-map": noSideEffectsInMap,
+    "no-void-return-functions": noVoidReturnFunctions,
+  },
+};
