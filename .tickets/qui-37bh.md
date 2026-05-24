@@ -1,6 +1,6 @@
 ---
 id: qui-37bh
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-05-23T22:14:17Z

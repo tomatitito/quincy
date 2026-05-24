@@ -1,6 +1,6 @@
 ---
 id: qui-y7ds
-status: in_progress
+status: open
 deps: []
 links: []
 created: 2026-05-23T22:48:56Z

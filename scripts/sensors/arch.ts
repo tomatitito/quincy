@@ -158,7 +158,7 @@ function checkImport(file: string, layer: Layer, imported: ImportRecord): Violat
 
   if (isAgentRelated(imported.specifier)) {
     violations.push(
-      violation(file, imported.line, "no-agent-imports", "Agent-related imports are out of scope for the Quincy rebuild.", imported.specifier),
+      violation(file, imported.line, "no-agent-imports", "Quincy is being rebuilt without agent functionality so the UI and ticket workflow stay focused and easy to reason about. Do not import agent-related code; create a non-agent port or ticket-focused adapter instead if this behavior is still needed.", imported.specifier),
     );
   }
 
@@ -169,7 +169,7 @@ function checkImport(file: string, layer: Layer, imported: ImportRecord): Violat
           file,
           imported.line,
           "domain-isolation",
-          "Domain code must not import routes, components, application use cases, or infrastructure adapters.",
+          "We want the domain to contain the stable business rules without knowing how they are delivered, displayed, or persisted. Domain code must not import routes, components, application use cases, or infrastructure adapters. Move orchestration outward into an application use case, and keep only pure domain types/rules here.",
           imported.specifier,
         ),
       );
@@ -181,7 +181,7 @@ function checkImport(file: string, layer: Layer, imported: ImportRecord): Violat
           file,
           imported.line,
           "domain-runtime-independence",
-          "Domain code must stay independent of UI frameworks, SvelteKit runtime modules, filesystem/process APIs, and HTTP/server modules.",
+          "We want domain code to run anywhere and be testable without SvelteKit, the browser, Node filesystem APIs, or HTTP. Keep runtime details at the edges; pass plain values into pure domain functions instead of importing framework or server modules here.",
           imported.specifier,
         ),
       );
@@ -195,7 +195,7 @@ function checkImport(file: string, layer: Layer, imported: ImportRecord): Violat
           file,
           imported.line,
           "application-boundary",
-          "Application use cases may depend on domain code and ports, but not routes, UI components, or concrete infrastructure.",
+          "We want application use cases to orchestrate domain behavior through ports without depending on delivery mechanisms or concrete adapters. Do not import routes, UI components, or infrastructure here; define/use a domain port and inject the concrete adapter from an inbound composition point.",
           imported.specifier,
         ),
       );
@@ -203,7 +203,7 @@ function checkImport(file: string, layer: Layer, imported: ImportRecord): Violat
 
     if (imported.specifier === "@sveltejs/kit" || isSvelteKitRuntimeImport(imported.specifier)) {
       violations.push(
-        violation(file, imported.line, "application-no-route-runtime", "Application use cases must not depend on SvelteKit request/runtime objects directly.", imported.specifier),
+        violation(file, imported.line, "application-no-route-runtime", "We want application use cases to be callable from SvelteKit, tests, CLI tools, or future adapters. Do not depend on SvelteKit request/runtime objects directly; translate framework objects into plain inputs before calling the use case.", imported.specifier),
       );
     }
   }
@@ -211,20 +211,26 @@ function checkImport(file: string, layer: Layer, imported: ImportRecord): Violat
   if (layer === "components") {
     if (importsFromInfrastructureOutbound(imported.specifier, file)) {
       violations.push(
-        violation(file, imported.line, "components-no-outbound-adapters", "Components must not import infrastructure outbound adapters directly.", imported.specifier),
+        violation(file, imported.line, "components-no-outbound-adapters", "We want Svelte components to render state and emit user intent, not perform persistence or filesystem work. Do not import outbound infrastructure adapters directly; load or mutate data through a route/inbound adapter and pass plain props/state into the component.", imported.specifier),
       );
     }
 
     if (isNodeRuntimeImport(imported.specifier)) {
       violations.push(
-        violation(file, imported.line, "components-browser-safe", "Components must not import filesystem/process/server runtime APIs.", imported.specifier),
+        violation(file, imported.line, "components-browser-safe", "We want components to stay browser-safe and reusable. Filesystem, process, and server runtime APIs belong behind server routes or infrastructure adapters; pass the resulting data into the component instead.", imported.specifier),
       );
     }
   }
 
   if (layer === "routes" && importedLayer === "domain") {
     violations.push(
-      violation(file, imported.line, "routes-stay-thin", "Routes should stay thin: call application use cases, the infrastructure inbound HTTP router, or components instead of importing domain directly.", imported.specifier),
+      violation(file, imported.line, "routes-stay-thin", "We want SvelteKit routes to stay thin composition roots, not places where domain decisions accumulate. Do not import domain directly from routes; call an application use case or an inbound infrastructure adapter that performs the composition.", imported.specifier),
+    );
+  }
+
+  if (layer === "routes" && importsFromInfrastructureOutbound(imported.specifier, file)) {
+    violations.push(
+      violation(file, imported.line, "routes-no-outbound-adapters", "We want routes to describe SvelteKit delivery concerns while adapter wiring lives in inbound infrastructure. Do not import outbound adapters directly from routes; create an inbound page/API adapter that wires config, repositories, and application use cases, then call that adapter from the route.", imported.specifier),
     );
   }
 
@@ -235,7 +241,7 @@ function checkFilePath(file: string): Violation[] {
   if (!isAgentRelated(relativeFile(file))) return [];
 
   return [
-    violation(file, 1, "no-agent-files", "Agent-related source files are out of scope for the Quincy rebuild."),
+    violation(file, 1, "no-agent-files", "Quincy is intentionally rebuilding the ticket UI without agent functionality. Agent-related source files expand the scope and blur the architecture; keep this code out of src, or create an explicit non-agent ticket/UI abstraction if needed."),
   ];
 }
 
