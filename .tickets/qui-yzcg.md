@@ -1,7 +1,7 @@
 ---
 id: qui-yzcg
 status: open
-deps: []
+deps: [qui-z7yr]
 links: []
 created: 2026-05-23T23:34:33Z
 type: task

@@ -117,6 +117,22 @@ function isAgentRelated(value: string): boolean {
   return /(^|[/_-])agents?($|[/_.-])/i.test(value);
 }
 
+function featureForPath(value: string): "agent" | "details" | "epic" | "graph" | "kanban" | undefined {
+  const normalized = value.toLowerCase();
+  if (/(^|[/_-])agents?($|[/_.-])/.test(normalized)) return "agent";
+  if (/(^|[/_-])details?($|[/_.-])/.test(normalized)) return "details";
+  if (/(^|[/_-])epics?($|[/_.-])/.test(normalized)) return "epic";
+  if (/(^|[/_-])graph($|[/_.-])/.test(normalized)) return "graph";
+  if (/(^|[/_-])kanban($|[/_.-])/.test(normalized)) return "kanban";
+  return undefined;
+}
+
+function applicationUseCaseName(file: string): string | undefined {
+  const rel = relativeFile(file);
+  if (!rel.startsWith("src/lib/application/")) return undefined;
+  return path.basename(rel, path.extname(rel));
+}
+
 async function listSourceFiles(directory: string): Promise<string[]> {
   if (!existsSync(directory)) return [];
 
@@ -154,6 +170,7 @@ function violation(file: string, line: number, rule: string, message: string, im
 
 function checkImport(file: string, layer: Layer, imported: ImportRecord): Violation[] {
   const importedLayer = layerForImport(imported.specifier, file);
+  const normalizedImport = normalizeImportPath(imported.specifier, file);
   const violations: Violation[] = [];
 
   if (isAgentRelated(imported.specifier)) {
@@ -189,6 +206,32 @@ function checkImport(file: string, layer: Layer, imported: ImportRecord): Violat
   }
 
   if (layer === "application") {
+    if (importedLayer === "application") {
+      violations.push(
+        violation(
+          file,
+          imported.line,
+          "application-use-cases-do-not-compose-use-cases",
+          "We want each application file to represent one clear use case. Do not compose application use cases from another application use case; compose multiple use cases in an inbound adapter or route loader instead.",
+          imported.specifier,
+        ),
+      );
+    }
+
+    const importerFeature = featureForPath(applicationUseCaseName(file) ?? "");
+    const importedFeature = featureForPath(normalizedImport ?? imported.specifier);
+    if (importerFeature !== undefined && importedFeature !== undefined && importerFeature !== importedFeature) {
+      violations.push(
+        violation(
+          file,
+          imported.line,
+          "application-feature-boundary",
+          `We want use cases to stay focused on their feature. A ${importerFeature} use case must not import ${importedFeature} feature code; move shared logic into neutral domain code or compose separate use cases in inbound infrastructure.`,
+          imported.specifier,
+        ),
+      );
+    }
+
     if (["routes", "components", "infrastructure"].includes(importedLayer)) {
       violations.push(
         violation(

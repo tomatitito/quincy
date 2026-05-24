@@ -28,8 +28,12 @@ export interface KanbanColumn {
 const orderedColumnIds: KanbanColumnId[] = ["backlog", "open", "in_progress", "closed"];
 
 export function createKanbanColumns(tickets: Ticket[]): KanbanColumn[] {
-  const views = tickets.map((ticket) => ({ ...ticket, ready: isReady(ticket, tickets) }));
+  const views = createTicketViews(tickets);
   return orderedColumnIds.map((id) => ({ id, tickets: views.filter((ticket) => columnIdForTicket(ticket) === id) }));
+}
+
+export function createTicketViews(tickets: Ticket[]): TicketView[] {
+  return tickets.map((ticket) => ({ ...ticket, ready: isReady(ticket, tickets) }));
 }
 
 function columnIdForTicket(ticket: TicketView): KanbanColumnId {

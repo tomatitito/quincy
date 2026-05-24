@@ -1,7 +1,7 @@
 ---
 id: qui-367i
 status: closed
-deps: []
+deps: [awb-hcap]
 links: []
 created: 2026-05-23T21:56:26Z
 type: task

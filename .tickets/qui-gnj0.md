@@ -1,7 +1,7 @@
 ---
 id: qui-gnj0
 status: closed
-deps: []
+deps: [awb-hcap]
 links: []
 created: 2026-05-23T20:31:17Z
 type: task

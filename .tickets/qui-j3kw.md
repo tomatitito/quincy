@@ -1,7 +1,7 @@
 ---
 id: qui-j3kw
 status: closed
-deps: []
+deps: [qui-367i]
 links: []
 created: 2026-05-23T23:31:14Z
 type: task

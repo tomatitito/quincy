@@ -1,7 +1,7 @@
 ---
 id: qui-oec9
 status: closed
-deps: []
+deps: [qui-gnj0]
 links: []
 created: 2026-05-23T22:33:20Z
 type: task

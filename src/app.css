@@ -350,3 +350,174 @@ select:focus-visible {
     scroll-snap-align: start;
   }
 }
+
+.graph-panel {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  min-height: 0;
+  padding: 16px 18px 24px;
+}
+
+.graph-controls,
+.graph-legend {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.graph-control-segment {
+  display: flex;
+  gap: 6px;
+}
+
+.graph-control-segment button {
+  background: transparent;
+  border: 1px solid var(--dim);
+  border-radius: 3px;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.graph-control-segment button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--body-bg);
+}
+
+.checkbox.compact {
+  font-size: 10px;
+}
+
+.graph-legend {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.graph-legend span {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+}
+
+.swatch {
+  border-radius: 999px;
+  display: inline-block;
+  height: 8px;
+  width: 18px;
+}
+
+.swatch.dep {
+  background: var(--border);
+}
+
+.swatch.critical {
+  background: var(--accent);
+}
+
+.graph-canvas {
+  border: 1px solid var(--dim);
+  border-radius: 4px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.graph-stage {
+  position: relative;
+}
+
+.graph-svg {
+  color: var(--border);
+  inset: 0;
+  overflow: visible;
+  position: absolute;
+}
+
+.graph-layer-band {
+  fill: rgba(255, 255, 255, 0.025);
+  stroke: rgba(255, 255, 255, 0.05);
+}
+
+.graph-layer-label {
+  fill: var(--dim);
+  font-size: 10px;
+}
+
+.graph-edge {
+  fill: none;
+  opacity: 0.72;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.graph-edge.critical {
+  color: var(--accent);
+  opacity: 1;
+  stroke-width: 3;
+}
+
+.graph-ticket-card {
+  background: var(--container-bg);
+  border: 1px solid var(--dim);
+  border-radius: 4px;
+  color: var(--text);
+  cursor: pointer;
+  display: grid;
+  gap: 8px;
+  grid-template-rows: auto 1fr auto;
+  padding: 10px;
+  position: absolute;
+  text-align: left;
+}
+
+.graph-ticket-card:hover,
+.graph-ticket-card.selected {
+  background: var(--selected-bg);
+  border-color: var(--accent);
+}
+
+.graph-ticket-card.critical {
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+
+.graph-ticket-card.ready .graph-ticket-card-meta span:last-child {
+  color: var(--success);
+}
+
+.graph-ticket-card-top,
+.graph-ticket-card-meta {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.graph-ticket-card-title {
+  display: -webkit-box;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.graph-ticket-card-meta {
+  color: var(--dim);
+  font-size: 10px;
+}
+
+.graph-empty-state {
+  background: var(--container-bg);
+  border: 1px solid var(--dim);
+  border-radius: 4px;
+  color: var(--muted);
+  margin: 16px 18px;
+  padding: 18px;
+}
+
+.graph-cycle-state strong,
+.stats-warning {
+  color: var(--warning);
+}

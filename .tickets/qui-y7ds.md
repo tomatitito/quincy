@@ -1,7 +1,7 @@
 ---
 id: qui-y7ds
 status: open
-deps: []
+deps: [qui-37bh]
 links: []
 created: 2026-05-23T22:48:56Z
 type: task

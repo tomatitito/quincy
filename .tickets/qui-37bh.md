@@ -1,7 +1,7 @@
 ---
 id: qui-37bh
 status: closed
-deps: []
+deps: [qui-j3kw]
 links: []
 created: 2026-05-23T22:14:17Z
 type: task
