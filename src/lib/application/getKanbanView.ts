@@ -7,6 +7,6 @@ export interface KanbanView {
 }
 
 export async function getKanbanView(repository: TicketRepository): Promise<KanbanView> {
-  const tickets = await repository.listTickets();
+  const tickets = await repository();
   return { columns: createKanbanColumns(tickets) };
 }

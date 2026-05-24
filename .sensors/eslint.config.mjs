@@ -25,6 +25,7 @@ export default [
       "sensors/no-domain-primitives": "warn",
       "sensors/no-local-type-alias": "warn",
       "sensors/no-side-effects-in-map": "warn",
+      "sensors/no-single-method-interface": "warn",
       "sensors/no-void-return-functions": ["warn", { allowFiles: ["**/*.test.ts", "**/*.spec.ts"] }],
     },
   },

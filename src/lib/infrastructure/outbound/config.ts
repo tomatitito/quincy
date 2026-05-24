@@ -5,7 +5,5 @@ const defaultProjectConfig: ProjectConfig = {
 };
 
 export function createConfigProvider(): ConfigProvider {
-  return {
-    getProjectConfig: async () => defaultProjectConfig,
-  };
+  return async () => defaultProjectConfig;
 }

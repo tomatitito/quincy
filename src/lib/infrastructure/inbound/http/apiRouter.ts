@@ -9,6 +9,6 @@ export async function handleApiRequest(request: Request): Promise<Response> {
 }
 
 async function loadKanban() {
-  const config = await createConfigProvider().getProjectConfig();
+  const config = await createConfigProvider()();
   return getKanbanView(createTicketFileRepository(config));
 }

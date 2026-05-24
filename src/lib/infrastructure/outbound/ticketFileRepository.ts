@@ -6,9 +6,7 @@ import type { Ticket, TicketStatus } from "$lib/domain/tickets";
 const frontmatterPattern = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/;
 
 export function createTicketFileRepository(config: ProjectConfig): TicketRepository {
-  return {
-    listTickets: async () => listMarkdownTickets(config.ticketDirectory),
-  };
+  return async () => listMarkdownTickets(config.ticketDirectory);
 }
 
 async function listMarkdownTickets(ticketDirectory: string): Promise<Ticket[]> {
