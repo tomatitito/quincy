@@ -4,6 +4,7 @@ import mutatedParamMustBeReturned from "./rules/mutated-param-must-be-returned.m
 import noClasses from "./rules/no-classes.mjs";
 import noDomainPrimitives from "./rules/no-domain-primitives.mjs";
 import noLocalTypeAlias from "./rules/no-local-type-alias.mjs";
+import noOverbroadParameterObject from "./rules/no-overbroad-parameter-object.mjs";
 import noSideEffectsInMap from "./rules/no-side-effects-in-map.mjs";
 import noSingleMethodInterface from "./rules/no-single-method-interface.mjs";
 import noVoidReturnFunctions from "./rules/no-void-return-functions.mjs";
@@ -16,6 +17,7 @@ export default {
     "no-classes": noClasses,
     "no-domain-primitives": noDomainPrimitives,
     "no-local-type-alias": noLocalTypeAlias,
+    "no-overbroad-parameter-object": noOverbroadParameterObject,
     "no-side-effects-in-map": noSideEffectsInMap,
     "no-single-method-interface": noSingleMethodInterface,
     "no-void-return-functions": noVoidReturnFunctions,
