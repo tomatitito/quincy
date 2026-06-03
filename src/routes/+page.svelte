@@ -5,7 +5,7 @@
   import KanbanBoard from "$lib/components/KanbanBoard.svelte";
 
   let { data } = $props();
-  let activeTab = $state<"graph" | "kanban" | "details">("graph");
+  let activeTab = $state<"graph" | "kanban" | "details" | "agent">("graph");
 
   const tickets = $derived(data.graph.tickets);
   const openCount = $derived(tickets.filter((ticket) => ticket.status === "open").length);
@@ -29,6 +29,7 @@
       <button type="button" class:active={activeTab === "graph"} onclick={() => (activeTab = "graph")}>Graph</button>
       <button type="button" class:active={activeTab === "kanban"} onclick={() => (activeTab = "kanban")}>Kanban</button>
       <button type="button" class:active={activeTab === "details"} onclick={() => (activeTab = "details")}>Details</button>
+      <button type="button" class:active={activeTab === "agent"} onclick={() => (activeTab = "agent")}>Agent</button>
     </nav>
     <div class="stats-row">
       <span>Total: {tickets.length}</span>
@@ -48,8 +49,10 @@
       <GraphView tickets={data.graph.tickets} graph={data.graph.graph} />
     {:else if activeTab === "kanban"}
       <KanbanBoard columns={data.kanban.columns} />
-    {:else}
+    {:else if activeTab === "details"}
       <section class="empty-state">Select a ticket in Graph or Kanban to inspect details.</section>
+    {:else}
+      <section class="empty-state">Agent panel is not connected yet.</section>
     {/if}
   </main>
 </div>
