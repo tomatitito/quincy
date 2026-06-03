@@ -1,6 +1,6 @@
 ---
 id: qui-z7yr
-status: in_progress
+status: closed
 deps: [qui-gnj0]
 links: []
 created: 2026-05-23T23:31:14Z
