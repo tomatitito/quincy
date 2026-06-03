@@ -5,6 +5,6 @@ import { createTicketFileRepository } from "$lib/infrastructure/outbound/ticketF
 
 export async function loadHomePage() {
   const config = await createConfigProvider()();
-  const repository = createTicketFileRepository(config);
+  const repository = createTicketFileRepository(config.ticketDirectory);
   return { graph: await getGraphView(repository), kanban: await getKanbanView(repository) };
 }

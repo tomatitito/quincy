@@ -1,12 +1,12 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
-import type { ProjectConfig, TicketRepository } from "$lib/domain/ports";
+import type { TicketDirectory, TicketRepository } from "$lib/domain/ports";
 import type { Ticket, TicketStatus } from "$lib/domain/tickets";
 
 const frontmatterPattern = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/;
 
-export function createTicketFileRepository(config: ProjectConfig): TicketRepository {
-  return async () => listMarkdownTickets(config.ticketDirectory);
+export function createTicketFileRepository(ticketDirectory: TicketDirectory): TicketRepository {
+  return async () => listMarkdownTickets(ticketDirectory);
 }
 
 async function listMarkdownTickets(ticketDirectory: string): Promise<Ticket[]> {
