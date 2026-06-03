@@ -1,0 +1,6 @@
+{
+	"command": "bun run sensors all",
+	"timeoutMs": 120000,
+	"shell": "zsh",
+	"shellArgs": ["-lc"]
+}
