@@ -22,6 +22,7 @@ export default [
       "sensors/max-function-lines": ["warn", { max: 10 }],
       "sensors/mutated-param-must-be-returned": "warn",
       "sensors/no-classes": "warn",
+      "sensors/no-default-parameters": "warn",
       "sensors/no-domain-primitives": "warn",
       "sensors/no-local-type-alias": "warn",
       "sensors/no-overbroad-parameter-object": "warn",

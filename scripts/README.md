@@ -37,6 +37,7 @@ Implemented as custom ESLint rules in `.sensors/eslint-plugin-sensors/`, copied 
 Current rules:
 
 - `sensors/mutated-param-must-be-returned`
+- `sensors/no-default-parameters`
 - `sensors/no-local-type-alias`
 - `sensors/no-side-effects-in-map`
 - `sensors/no-void-return-functions`
