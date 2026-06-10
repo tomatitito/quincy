@@ -117,6 +117,15 @@ function isAgentRelated(value: string): boolean {
   return /(^|[/_-])agents?($|[/_.-])/i.test(value);
 }
 
+function isAllowedAgentPanelPath(value: string): boolean {
+  return value === "src/lib/components/AgentPanel.svelte";
+}
+
+function isAllowedAgentPanelImport(specifier: string, importerFile: string): boolean {
+  const normalized = normalizeImportPath(specifier, importerFile);
+  return normalized !== undefined && isAllowedAgentPanelPath(normalized);
+}
+
 function featureForPath(value: string): "agent" | "details" | "epic" | "graph" | "kanban" | undefined {
   const normalized = value.toLowerCase();
   if (/(^|[/_-])agents?($|[/_.-])/.test(normalized)) return "agent";
@@ -173,9 +182,9 @@ function checkImport(file: string, layer: Layer, imported: ImportRecord): Violat
   const normalizedImport = normalizeImportPath(imported.specifier, file);
   const violations: Violation[] = [];
 
-  if (isAgentRelated(imported.specifier)) {
+  if (isAgentRelated(imported.specifier) && !isAllowedAgentPanelImport(imported.specifier, file)) {
     violations.push(
-      violation(file, imported.line, "no-agent-imports", "Quincy is being rebuilt without agent functionality so the UI and ticket workflow stay focused and easy to reason about. Do not import agent-related code; create a non-agent port or ticket-focused adapter instead if this behavior is still needed.", imported.specifier),
+      violation(file, imported.line, "no-agent-imports", "Quincy only allows the bounded Agent panel shell at this stage. Do not import agent runtime or unrelated agent code; create a neutral app-event adapter instead if this behavior is still needed.", imported.specifier),
     );
   }
 
@@ -281,10 +290,11 @@ function checkImport(file: string, layer: Layer, imported: ImportRecord): Violat
 }
 
 function checkFilePath(file: string): Violation[] {
-  if (!isAgentRelated(relativeFile(file))) return [];
+  const rel = relativeFile(file);
+  if (!isAgentRelated(rel) || isAllowedAgentPanelPath(rel)) return [];
 
   return [
-    violation(file, 1, "no-agent-files", "Quincy is intentionally rebuilding the ticket UI without agent functionality. Agent-related source files expand the scope and blur the architecture; keep this code out of src, or create an explicit non-agent ticket/UI abstraction if needed."),
+    violation(file, 1, "no-agent-files", "Quincy only allows the bounded Agent panel shell at this stage. Agent-related source files expand the scope and blur the architecture; keep this code out of src unless a ticket explicitly introduces the boundary."),
   ];
 }
 

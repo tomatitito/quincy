@@ -1,6 +1,6 @@
 ---
 id: qui-asj6
-status: open
+status: closed
 deps: [qui-qnqo, qui-y7ds]
 links: []
 created: 2026-06-03T00:00:00Z

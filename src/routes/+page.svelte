@@ -2,11 +2,15 @@
   import { invalidateAll } from "$app/navigation";
   import { onMount } from "svelte";
   import AppHeader from "$lib/components/AppHeader.svelte";
+  import AgentPanel from "$lib/components/AgentPanel.svelte";
   import GraphView from "$lib/components/GraphView.svelte";
   import KanbanBoard from "$lib/components/KanbanBoard.svelte";
+  import { openAppEventStream } from "$lib/infrastructure/inbound/browser/appEvents";
+  import type { BrowserAppEventStream } from "$lib/infrastructure/inbound/browser/appEvents";
 
   let { data } = $props();
   let activeTab = $state<"graph" | "kanban" | "details" | "agent">("graph");
+  let appEvents = $state<BrowserAppEventStream>();
 
   const tickets = $derived(data.graph.tickets);
   const openCount = $derived(tickets.filter((ticket) => ticket.status === "open").length);
@@ -18,9 +22,13 @@
   }
 
   onMount(() => {
-    const appEvents = new EventSource("/events");
-    appEvents.addEventListener("tickets.changed", () => refreshTickets());
-    return () => appEvents.close();
+    appEvents = openAppEventStream("/events");
+    const unlistenTickets = appEvents.listen(["tickets.changed"], refreshTickets);
+
+    return () => {
+      unlistenTickets();
+      appEvents?.close();
+    };
   });
 </script>
 
@@ -59,7 +67,7 @@
     {:else if activeTab === "details"}
       <section class="empty-state">Select a ticket in Graph or Kanban to inspect details.</section>
     {:else}
-      <section class="empty-state">Agent panel is not connected yet.</section>
+      <AgentPanel {appEvents} />
     {/if}
   </main>
 </div>
