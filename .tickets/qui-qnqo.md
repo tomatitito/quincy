@@ -1,6 +1,6 @@
 ---
 id: qui-qnqo
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-03T00:00:00Z
