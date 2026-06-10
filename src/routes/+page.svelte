@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invalidateAll } from "$app/navigation";
+  import { onMount } from "svelte";
   import AppHeader from "$lib/components/AppHeader.svelte";
   import GraphView from "$lib/components/GraphView.svelte";
   import KanbanBoard from "$lib/components/KanbanBoard.svelte";
@@ -15,6 +16,12 @@
   function refreshTickets() {
     void invalidateAll();
   }
+
+  onMount(() => {
+    const appEvents = new EventSource("/events");
+    appEvents.addEventListener("tickets.changed", () => refreshTickets());
+    return () => appEvents.close();
+  });
 </script>
 
 <svelte:head>
