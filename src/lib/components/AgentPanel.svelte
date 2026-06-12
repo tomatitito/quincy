@@ -14,7 +14,7 @@
   let output = $state<string[]>([]);
 
   const statusLabel = $derived(status === "empty" ? "Not connected" : status);
-  const canSendSessionCommand = $derived(activeSessionId !== undefined && !commandBusy);
+  const canSubmitInput = $derived(inputText.length > 0 && !commandBusy);
 
   $effect(() => {
     if (appEvents === undefined) return;
@@ -59,23 +59,32 @@
 
   async function startSession() {
     const result = await sendCommand("/api/agent/start", {});
-    if (result === undefined) return;
+    if (result === undefined) return undefined;
     activeSessionId = result.sessionId;
+    commandMessage = result.message;
+    return result;
+  }
+
+  async function sendInput() {
+    if (inputText.length === 0) return;
+    const sessionId = activeSessionId ?? (await startSession())?.sessionId;
+    if (sessionId === undefined) return;
+    const result = await sendCommand("/api/agent/input", { sessionId, input: inputText });
+    if (result === undefined) return;
+    inputText = "";
     commandMessage = result.message;
   }
 
-  async function stopSession() {
-    if (activeSessionId === undefined) return;
+  async function stopActiveSession() {
+    if (activeSessionId === undefined || commandBusy) return;
     const result = await sendCommand("/api/agent/stop", { sessionId: activeSessionId });
     if (result !== undefined) commandMessage = result.message;
   }
 
-  async function sendInput() {
-    if (activeSessionId === undefined || inputText.length === 0) return;
-    const result = await sendCommand("/api/agent/input", { sessionId: activeSessionId, input: inputText });
-    if (result === undefined) return;
-    inputText = "";
-    commandMessage = result.message;
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    void stopActiveSession();
   }
 
   async function sendCommand(url: string, body: Record<string, unknown>): Promise<AgentCommandResult | undefined> {
@@ -133,47 +142,61 @@
   }
 </script>
 
+<svelte:window onkeydown={handleKeydown} />
+
 <section class="agent-panel" aria-label="Agent panel">
   <header>
     <div>
       <p class="eyebrow">Agent</p>
       <h2>Session activity</h2>
     </div>
-    <span class:running={status === "running"} class:completed={status === "completed"} class:failed={status === "failed"}>{statusLabel}</span>
+    <div class="agent-header-actions">
+      <button type="button" onclick={startSession} disabled={commandBusy}>Start session</button>
+      <span class:running={status === "running"} class:completed={status === "completed"} class:failed={status === "failed"}>{statusLabel}</span>
+    </div>
   </header>
 
   <p class="agent-message">{message}</p>
 
-  <section class="agent-commands" aria-label="Agent commands">
-    <button type="button" onclick={startSession} disabled={commandBusy}>Start session</button>
-    <button type="button" onclick={stopSession} disabled={!canSendSessionCommand}>Stop session</button>
-    <label>
-      Input
-      <textarea bind:value={inputText} disabled={!canSendSessionCommand} placeholder="Send input to the active agent session"></textarea>
-    </label>
-    <button type="button" onclick={sendInput} disabled={!canSendSessionCommand || inputText.length === 0}>Send input</button>
-    <p>{commandMessage}</p>
-  </section>
+  <div class="agent-transcript" data-agent-transcript-scroll>
+    {#if output.length > 0}
+      <pre aria-label="Agent output">{output.join("\n")}</pre>
+    {:else}
+      <div class="agent-empty-state">Waiting for agent events from the app event stream. No runtime or commands are connected yet.</div>
+    {/if}
+  </div>
 
-  {#if output.length > 0}
-    <pre aria-label="Agent output">{output.join("\n")}</pre>
-  {:else}
-    <div class="agent-empty-state">Waiting for agent events from the app event stream. No runtime or commands are connected yet.</div>
-  {/if}
+  <section class="agent-commands" aria-label="Agent commands">
+    <p>{commandMessage}</p>
+    <div class="agent-chat-input">
+      <label>
+        <span class="visually-hidden">Input</span>
+        <textarea bind:value={inputText} disabled={commandBusy} placeholder="Send input to the active agent session"></textarea>
+      </label>
+      <button type="button" onclick={sendInput} disabled={!canSubmitInput} aria-label="Send input">↑</button>
+    </div>
+  </section>
 </section>
 
 <style>
   .agent-panel {
+    background: var(--container-bg);
     display: grid;
-    gap: 14px;
-    padding: 16px 18px 24px;
+    font-size: 13px;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    height: 100%;
+    line-height: 1.45;
+    min-height: 0;
+    overflow: hidden;
   }
 
   header {
     align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     display: flex;
     gap: 12px;
     justify-content: space-between;
+    padding: 12px 18px;
   }
 
   .eyebrow {
@@ -215,25 +238,89 @@
   }
 
   .agent-commands {
-    border: 1px solid var(--dim);
-    border-radius: 4px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
     display: grid;
+    gap: 10px;
+    justify-self: center;
+    padding: 12px 18px 16px;
+    width: 50%;
+  }
+
+  .agent-header-actions {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
     gap: 8px;
+    justify-content: flex-end;
+  }
+
+  .agent-chat-input {
+    background: var(--body-bg);
+    border: 1px solid var(--dim);
+    border-radius: 22px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: 96px;
     padding: 12px;
   }
 
-  .agent-commands button {
-    justify-self: start;
+  .agent-chat-input:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
   }
 
-  .agent-commands label {
-    color: var(--muted);
-    display: grid;
-    gap: 6px;
+  .agent-chat-input label {
+    min-width: 0;
+  }
+
+  .agent-chat-input button {
+    align-self: end;
+    border-radius: 999px;
+    font-size: 18px;
+    height: 38px;
+    justify-self: end;
+    line-height: 1;
+    padding: 0;
+    width: 38px;
+  }
+
+  button,
+  textarea {
+    background: var(--body-bg);
+    border: 1px solid var(--dim);
+    border-radius: 3px;
+    color: var(--text);
+    font: inherit;
+  }
+
+  button {
+    cursor: pointer;
+    padding: 4px 8px;
+  }
+
+  button:disabled,
+  textarea:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
   }
 
   textarea {
+    border: 0;
     min-height: 72px;
+    outline: none;
+    padding: 0 10px 0 0;
+    resize: none;
+    width: 100%;
+  }
+
+  .visually-hidden {
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    height: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
   }
 
   .agent-message,
@@ -243,17 +330,120 @@
     margin: 0;
   }
 
-  .agent-empty-state,
-  pre {
-    border: 1px solid var(--dim);
-    border-radius: 4px;
-    padding: 12px;
+  .agent-message {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 10px 18px;
+  }
+
+  .agent-transcript {
+    background: rgb(31, 32, 40);
+    min-height: 0;
+    overflow-x: clip;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    padding: 18px;
+    scrollbar-gutter: stable;
+  }
+
+  .agent-empty-state {
+    align-items: center;
+    display: flex;
+    min-height: 100%;
+    padding: 12px 0;
   }
 
   pre {
     color: var(--text);
     margin: 0;
-    overflow: auto;
+    overflow: visible;
     white-space: pre-wrap;
+  }
+
+  @media (max-width: 1200px) {
+    .agent-commands {
+      width: 65%;
+    }
+  }
+
+  @media (max-width: 900px) {
+    .agent-commands {
+      width: 80%;
+    }
+  }
+
+  @media (max-width: 760px) {
+    header {
+      padding: 10px 12px;
+    }
+
+    .agent-message {
+      padding: 8px 12px;
+    }
+
+    .agent-transcript {
+      padding: 12px;
+    }
+
+    .agent-commands {
+      gap: 8px;
+      padding: 10px 12px 12px;
+      width: 100%;
+    }
+
+    .agent-header-actions button {
+      min-height: 36px;
+    }
+
+    .agent-chat-input {
+      border-radius: 18px;
+      min-height: 84px;
+      padding: 10px;
+    }
+
+    .agent-chat-input button {
+      height: 40px;
+      width: 40px;
+    }
+  }
+
+  @media (max-width: 420px) {
+    .agent-panel {
+      font-size: 12px;
+    }
+
+    header {
+      align-items: flex-start;
+      gap: 8px;
+      padding: 8px 10px;
+    }
+
+    h2 {
+      font-size: 14px;
+    }
+
+    .agent-message {
+      padding: 8px 10px;
+    }
+
+    .agent-transcript {
+      padding: 10px;
+    }
+
+    .agent-commands {
+      padding: 8px 10px 10px;
+    }
+
+    .agent-header-actions {
+      align-items: flex-end;
+      flex-direction: column;
+    }
+
+    .agent-chat-input {
+      min-height: 78px;
+    }
+
+    textarea {
+      min-height: 56px;
+    }
   }
 </style>
