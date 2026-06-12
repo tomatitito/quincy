@@ -12,7 +12,7 @@ tags: [agents, events, infrastructure, pi]
 ---
 # Emit agent runtime events through the app event hub
 
-Connect the agent runner infrastructure adapter to the generic app event hub so browser UI receives agent status and output through the same event stream used by other app events.
+Connect the agent repository infrastructure adapter to the generic app event hub so browser UI receives agent status and output through the same event stream used by other app events.
 
 ## Scope
 

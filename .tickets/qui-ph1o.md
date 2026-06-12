@@ -35,7 +35,7 @@ Balanced coupling goal: agent behavior is expected to be volatile, and it crosse
 ## Acceptance Criteria
 
 - Agent UI code does not import or directly depend on pi runtime implementation details.
-- Commands flow through UI/API -> application use case -> agent runner port -> infrastructure adapter.
+- Commands flow through UI/API -> application use case -> agent repository port -> infrastructure adapter.
 - Agent updates flow through infrastructure adapter -> app event hub -> SSE/browser subscriber -> Agent panel state.
 - Event contracts remain generic app events, not a ticket-only or agent-only transport.
 - The implementation preserves existing ticket graph and kanban behavior.

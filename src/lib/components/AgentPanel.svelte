@@ -7,9 +7,14 @@
 
   let status = $state<AgentStatus>("empty");
   let message = $state("No agent session has reported activity yet.");
+  let commandMessage = $state("No agent command has been sent yet.");
+  let inputText = $state("");
+  let activeSessionId = $state<string>();
+  let commandBusy = $state(false);
   let output = $state<string[]>([]);
 
   const statusLabel = $derived(status === "empty" ? "Not connected" : status);
+  const canSendSessionCommand = $derived(activeSessionId !== undefined && !commandBusy);
 
   $effect(() => {
     if (appEvents === undefined) return;
@@ -44,6 +49,60 @@
     }
   }
 
+  async function startSession() {
+    const result = await sendCommand("/api/agent/start", {});
+    if (result === undefined) return;
+    activeSessionId = result.sessionId;
+    commandMessage = result.message;
+  }
+
+  async function stopSession() {
+    if (activeSessionId === undefined) return;
+    const result = await sendCommand("/api/agent/stop", { sessionId: activeSessionId });
+    if (result !== undefined) commandMessage = result.message;
+  }
+
+  async function sendInput() {
+    if (activeSessionId === undefined || inputText.length === 0) return;
+    const result = await sendCommand("/api/agent/input", { sessionId: activeSessionId, input: inputText });
+    if (result === undefined) return;
+    inputText = "";
+    commandMessage = result.message;
+  }
+
+  async function sendCommand(url: string, body: Record<string, unknown>): Promise<AgentCommandResult | undefined> {
+    commandBusy = true;
+    try {
+      const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      if (!response.ok) return reportCommandFailure(response.statusText);
+      return parseCommandResult(await response.json());
+    } catch {
+      return reportCommandFailure("Agent command failed.");
+    } finally {
+      commandBusy = false;
+    }
+  }
+
+  function reportCommandFailure(text: string): undefined {
+    commandMessage = text;
+    return undefined;
+  }
+
+  interface AgentCommandResult {
+    accepted: boolean;
+    sessionId: string;
+    message: string;
+  }
+
+  function parseCommandResult(value: unknown): AgentCommandResult | undefined {
+    const result = asRecord(value);
+    if (result?.accepted !== true) return undefined;
+    const sessionId = stringFrom(result.sessionId);
+    const message = stringFrom(result.message);
+    if (sessionId === undefined || message === undefined) return undefined;
+    return { accepted: true, sessionId, message };
+  }
+
   function toStatus(value: unknown): AgentStatus | undefined {
     if (value === "idle") return "empty";
     if (value === "running" || value === "completed" || value === "failed") return value;
@@ -76,6 +135,17 @@
   </header>
 
   <p class="agent-message">{message}</p>
+
+  <section class="agent-commands" aria-label="Agent commands">
+    <button type="button" onclick={startSession} disabled={commandBusy}>Start session</button>
+    <button type="button" onclick={stopSession} disabled={!canSendSessionCommand}>Stop session</button>
+    <label>
+      Input
+      <textarea bind:value={inputText} disabled={!canSendSessionCommand} placeholder="Send input to the active agent session"></textarea>
+    </label>
+    <button type="button" onclick={sendInput} disabled={!canSendSessionCommand || inputText.length === 0}>Send input</button>
+    <p>{commandMessage}</p>
+  </section>
 
   {#if output.length > 0}
     <pre aria-label="Agent output">{output.join("\n")}</pre>
@@ -136,8 +206,31 @@
     color: var(--error);
   }
 
+  .agent-commands {
+    border: 1px solid var(--dim);
+    border-radius: 4px;
+    display: grid;
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .agent-commands button {
+    justify-self: start;
+  }
+
+  .agent-commands label {
+    color: var(--muted);
+    display: grid;
+    gap: 6px;
+  }
+
+  textarea {
+    min-height: 72px;
+  }
+
   .agent-message,
-  .agent-empty-state {
+  .agent-empty-state,
+  .agent-commands p {
     color: var(--muted);
     margin: 0;
   }
