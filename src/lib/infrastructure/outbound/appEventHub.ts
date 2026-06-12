@@ -4,6 +4,8 @@ export interface AppEvent {
   occurredAt: string;
 }
 
+export type AppEventPublisher = (event: Omit<AppEvent, "occurredAt">) => AppEvent;
+
 type AppEventSubscriber = (event: AppEvent) => unknown;
 
 const subscribers = new Set<AppEventSubscriber>();

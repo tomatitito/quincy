@@ -31,7 +31,7 @@
   function handleStatusEvent(event: BrowserAppEvent) {
     const payload = asRecord(event.payload);
     const nextStatus = toStatus(payload?.status);
-    if (nextStatus === undefined) return;
+    if (nextStatus === undefined || !acceptAgentEvent(payload)) return;
 
     status = nextStatus;
     message = stringFrom(payload?.message) ?? defaultMessage(nextStatus);
@@ -40,13 +40,21 @@
   function handleOutputEvent(event: BrowserAppEvent) {
     const payload = asRecord(event.payload);
     const text = stringFrom(payload?.text) ?? stringFrom(payload?.output) ?? stringFrom(payload?.chunk) ?? stringFrom(payload?.line);
-    if (text === undefined || text.length === 0) return;
+    if (text === undefined || text.length === 0 || !acceptAgentEvent(payload)) return;
 
     output = [...output, text];
     if (status === "empty") {
       status = "running";
       message = defaultMessage("running");
     }
+  }
+
+  function acceptAgentEvent(payload: Record<string, unknown> | undefined): boolean {
+    const sessionId = stringFrom(payload?.sessionId);
+    if (sessionId === undefined) return activeSessionId === undefined;
+    if (activeSessionId !== undefined) return sessionId === activeSessionId;
+    activeSessionId = sessionId;
+    return true;
   }
 
   async function startSession() {

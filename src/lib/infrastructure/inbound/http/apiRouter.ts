@@ -1,12 +1,14 @@
+import { randomUUID } from "node:crypto";
 import { sendAgentInput } from "$lib/application/sendAgentInput";
 import { startAgentSession } from "$lib/application/startAgentSession";
 import { stopAgentSession } from "$lib/application/stopAgentSession";
 import { getKanbanView } from "$lib/application/getKanbanView";
 import { createConfigProvider } from "$lib/infrastructure/outbound/config";
 import { createStubAgentRepository } from "$lib/infrastructure/outbound/agentRepository";
+import { publishAppEvent } from "$lib/infrastructure/outbound/appEventHub";
 import { createTicketFileRepository } from "$lib/infrastructure/outbound/ticketFileRepository";
 
-const agentRepository = createStubAgentRepository();
+const agentRepository = createStubAgentRepository({ createSessionId: randomUUID, publishEvent: publishAppEvent });
 
 export async function handleApiRequest(request: Request): Promise<Response> {
   const path = new URL(request.url).pathname;
