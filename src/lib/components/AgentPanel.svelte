@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { BrowserAppEvent, BrowserAppEventStream } from "$lib/infrastructure/inbound/browser/appEvents";
 
-  type AgentStatus = "empty" | "running" | "completed" | "failed";
+  type AgentStatus = "empty" | "running" | "completed" | "failed" | "cancelled";
 
   let { appEvents }: { appEvents?: BrowserAppEventStream } = $props();
 
@@ -122,7 +122,7 @@
 
   function toStatus(value: unknown): AgentStatus | undefined {
     if (value === "idle") return "empty";
-    if (value === "running" || value === "completed" || value === "failed") return value;
+    if (value === "running" || value === "completed" || value === "failed" || value === "cancelled") return value;
     return undefined;
   }
 
@@ -130,6 +130,7 @@
     if (value === "running") return "Agent session is running.";
     if (value === "completed") return "Agent session completed.";
     if (value === "failed") return "Agent session failed.";
+    if (value === "cancelled") return "Agent session cancelled.";
     return "No agent session has reported activity yet.";
   }
 
@@ -152,7 +153,7 @@
     </div>
     <div class="agent-header-actions">
       <button type="button" onclick={startSession} disabled={commandBusy}>Start session</button>
-      <span class:running={status === "running"} class:completed={status === "completed"} class:failed={status === "failed"}>{statusLabel}</span>
+      <span class:running={status === "running"} class:completed={status === "completed"} class:failed={status === "failed"} class:cancelled={status === "cancelled"}>{statusLabel}</span>
     </div>
   </header>
 
@@ -235,6 +236,11 @@
   .failed {
     border-color: var(--error);
     color: var(--error);
+  }
+
+  .cancelled {
+    border-color: var(--muted);
+    color: var(--muted);
   }
 
   .agent-commands {

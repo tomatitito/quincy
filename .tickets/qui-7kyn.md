@@ -1,6 +1,6 @@
 ---
 id: qui-7kyn
-status: open
+status: closed
 deps: [qui-2n77, qui-y7ds]
 links: []
 created: 2026-06-03T00:00:00Z
