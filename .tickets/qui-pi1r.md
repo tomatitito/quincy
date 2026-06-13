@@ -1,6 +1,6 @@
 ---
 id: qui-pi1r
-status: open
+status: closed
 deps: [qui-2n77, qui-7kyn, qui-asj6]
 links: []
 created: 2026-06-13T00:00:00Z
