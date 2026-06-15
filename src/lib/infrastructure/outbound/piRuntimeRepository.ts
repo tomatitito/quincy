@@ -93,11 +93,11 @@ function toRuntimeEvent(value: unknown): AgentRuntimeEvent | undefined {
     case "turn_end":
       return { type: "turn_end", status: statusFromMessage(event.message), message: messageText(event.message) };
     case "message_start":
-      return { type: "message_start", id: messageId(event.message), role: messageRole(event.message), text: messageText(event.message) };
+      return { type: "message_start", id: eventMessageId(event), role: messageRole(event.message), text: messageText(event.message) };
     case "message_update":
-      return { type: "message_update", id: messageId(event.message), role: messageRole(event.message), delta: deltaText(event.assistantMessageEvent), text: messageText(event.message) };
+      return { type: "message_update", id: eventMessageId(event), role: messageRole(event.message), delta: deltaText(event.assistantMessageEvent), text: messageText(event.message) };
     case "message_end":
-      return { type: "message_end", id: messageId(event.message), role: messageRole(event.message), text: messageText(event.message) };
+      return { type: "message_end", id: eventMessageId(event), role: messageRole(event.message), text: messageText(event.message) };
     case "tool_execution_start":
       return { type: "tool_execution_start", id: stringValue(event.toolCallId), name: stringValue(event.toolName), input: event.args };
     case "tool_execution_update":
@@ -148,8 +148,13 @@ function messageFromMessages(messages: unknown[]): string | undefined {
   return messageText(messages.at(-1));
 }
 
+function eventMessageId(event: Record<string, unknown>): string | undefined {
+  return messageId(event.message) ?? messageId(event.assistantMessageEvent);
+}
+
 function messageId(message: unknown): string | undefined {
-  return stringValue(asRecord(message)?.id);
+  const record = asRecord(message);
+  return stringValue(record?.id) ?? stringValue(record?.messageId);
 }
 
 function messageRole(message: unknown): string | undefined {

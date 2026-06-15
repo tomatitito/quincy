@@ -11,7 +11,7 @@
   let inputText = $state("");
   let activeSessionId = $state<string>();
   let commandBusy = $state(false);
-  let output = $state<string[]>([]);
+  let output = $state<AgentOutput[]>([]);
 
   const statusLabel = $derived(status === "empty" ? "Not connected" : status);
   const canSubmitInput = $derived(inputText.length > 0 && !commandBusy);
@@ -42,7 +42,7 @@
     const text = stringFrom(payload?.text) ?? stringFrom(payload?.output) ?? stringFrom(payload?.chunk) ?? stringFrom(payload?.line);
     if (text === undefined || text.length === 0 || !acceptAgentEvent(payload)) return;
 
-    output = [...output, text];
+    output = updateOutput(output, payload, text);
     if (status === "empty") {
       status = "running";
       message = defaultMessage("running");
@@ -111,6 +111,20 @@
     message: string;
   }
 
+  interface AgentOutput {
+    key?: string;
+    text: string;
+  }
+
+  function updateOutput(currentOutput: AgentOutput[], payload: Record<string, unknown> | undefined, text: string): AgentOutput[] {
+    const key = stringFrom(payload?.messageId);
+    const strategy = payload?.strategy === "replace" ? "replace" : "append";
+    const index = key === undefined ? currentOutput.length - 1 : currentOutput.findIndex((entry) => entry.key === key);
+    if (index === -1) return [...currentOutput, { key, text }];
+
+    return currentOutput.map((entry, entryIndex) => (entryIndex === index ? { key: entry.key ?? key, text: strategy === "replace" ? text : entry.text + text } : entry));
+  }
+
   function parseCommandResult(value: unknown): AgentCommandResult | undefined {
     const result = asRecord(value);
     if (result?.accepted !== true) return undefined;
@@ -161,7 +175,7 @@
 
   <div class="agent-transcript" data-agent-transcript-scroll>
     {#if output.length > 0}
-      <pre aria-label="Agent output">{output.join("\n")}</pre>
+      <pre aria-label="Agent output">{output.map((entry) => entry.text).join("\n")}</pre>
     {:else}
       <div class="agent-empty-state">Waiting for agent events from the app event stream. No runtime or commands are connected yet.</div>
     {/if}
