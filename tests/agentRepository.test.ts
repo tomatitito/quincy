@@ -67,7 +67,7 @@ describe("createStubAgentRepository", () => {
     scenario.then.lastCommandResultWas({ accepted: true, sessionId: "session-1", message: "Agent start command accepted by stub repository." });
     scenario.then.eventWasPublished({ type: "agent.started", payload: { sessionId: "session-1", message: "Stub agent session is running." } });
     scenario.then.eventWasPublished({ type: "agent.status.changed", payload: { sessionId: "session-1", status: "running", message: "Stub agent session is running." } });
-    scenario.then.eventWasPublished({ type: "agent.output.appended", payload: { sessionId: "session-1", messageId: "stub-message-1", strategy: "append", text: "Stub agent session started." } });
+    scenario.then.eventWasPublished({ type: "agent.output.appended", payload: { sessionId: "session-1", messageId: "stub-message-1", role: "assistant", strategy: "append", text: "Stub agent session started." } });
     scenario.then.eventsWerePublishedTimes(8);
   });
 
@@ -80,7 +80,7 @@ describe("createStubAgentRepository", () => {
     scenario.then.eventWasPublished({ type: "agent.tool.started", payload: { sessionId: "session-2", toolCallId: "stub-tool-1", name: "stub_adapter", input: "next step" } });
     scenario.then.eventWasPublished({ type: "agent.compaction.ended", payload: { sessionId: "session-2", status: "completed", message: "Stub compaction completed." } });
     scenario.then.eventWasPublished({ type: "agent.retry.ended", payload: { sessionId: "session-2", status: "completed", message: "Stub retry cycle completed." } });
-    scenario.then.eventWasPublished({ type: "agent.output.appended", payload: { sessionId: "session-2", messageId: "stub-message-input", strategy: "append", text: "Stub agent received input: next step" } });
+    scenario.then.eventWasPublished({ type: "agent.output.appended", payload: { sessionId: "session-2", messageId: "stub-message-input", role: "assistant", strategy: "append", text: "Stub agent received input: next step" } });
     scenario.then.eventsWerePublishedTimes(9);
   });
 
@@ -90,7 +90,7 @@ describe("createStubAgentRepository", () => {
     await scenario.when.agentStops();
 
     scenario.then.lastCommandResultWas({ accepted: true, sessionId: "session-3", message: "Agent stop command accepted by stub repository." });
-    scenario.then.eventWasPublished({ type: "agent.output.appended", payload: { sessionId: "session-3", messageId: "stub-message-stop", strategy: "append", text: "Stub agent session stopped." } });
+    scenario.then.eventWasPublished({ type: "agent.output.appended", payload: { sessionId: "session-3", messageId: "stub-message-stop", role: "assistant", strategy: "append", text: "Stub agent session stopped." } });
     scenario.then.eventWasPublished({ type: "agent.ended", payload: { sessionId: "session-3", status: "cancelled", message: "Stub agent session cancelled." } });
     scenario.then.eventWasPublished({ type: "agent.status.changed", payload: { sessionId: "session-3", status: "cancelled", message: "Stub agent session cancelled." } });
     scenario.then.eventsWerePublishedTimes(5);

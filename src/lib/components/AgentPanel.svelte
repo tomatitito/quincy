@@ -69,7 +69,9 @@
     if (inputText.length === 0) return;
     const sessionId = activeSessionId ?? (await startSession())?.sessionId;
     if (sessionId === undefined) return;
-    const result = await sendCommand("/api/agent/input", { sessionId, input: inputText });
+    const input = inputText;
+    output = [...output, { key: `user-${crypto.randomUUID()}`, role: "user", text: input }];
+    const result = await sendCommand("/api/agent/input", { sessionId, input });
     if (result === undefined) return;
     inputText = "";
     commandMessage = result.message;
@@ -111,18 +113,23 @@
     message: string;
   }
 
+  type AgentOutputRole = "user" | "assistant";
+
   interface AgentOutput {
     key?: string;
+    role: AgentOutputRole;
     text: string;
   }
 
   function updateOutput(currentOutput: AgentOutput[], payload: Record<string, unknown> | undefined, text: string): AgentOutput[] {
     const key = stringFrom(payload?.messageId);
+    const role = roleFrom(payload?.role);
     const strategy = payload?.strategy === "replace" ? "replace" : "append";
-    const index = key === undefined ? currentOutput.length - 1 : currentOutput.findIndex((entry) => entry.key === key);
-    if (index === -1) return [...currentOutput, { key, text }];
+    const lastIndex = currentOutput.length - 1;
+    const index = key === undefined ? (currentOutput[lastIndex]?.role === role ? lastIndex : -1) : currentOutput.findIndex((entry) => entry.key === key);
+    if (index === -1) return [...currentOutput, { key, role, text }];
 
-    return currentOutput.map((entry, entryIndex) => (entryIndex === index ? { key: entry.key ?? key, text: strategy === "replace" ? text : entry.text + text } : entry));
+    return currentOutput.map((entry, entryIndex) => (entryIndex === index ? { key: entry.key ?? key, role, text: strategy === "replace" ? text : entry.text + text } : entry));
   }
 
   function parseCommandResult(value: unknown): AgentCommandResult | undefined {
@@ -146,6 +153,10 @@
     if (value === "failed") return "Agent session failed.";
     if (value === "cancelled") return "Agent session cancelled.";
     return "No agent session has reported activity yet.";
+  }
+
+  function roleFrom(value: unknown): AgentOutputRole {
+    return value === "user" ? "user" : "assistant";
   }
 
   function stringFrom(value: unknown): string | undefined {
@@ -175,7 +186,14 @@
 
   <div class="agent-transcript" data-agent-transcript-scroll>
     {#if output.length > 0}
-      <pre aria-label="Agent output">{output.map((entry) => entry.text).join("\n")}</pre>
+      <div class="agent-output-list" aria-label="Agent output">
+        {#each output as entry (entry.key ?? entry.text)}
+          <article class="agent-output-message" class:user-message={entry.role === "user"} class:pi-message={entry.role === "assistant"}>
+            <p>{entry.role === "user" ? "You" : "Pi"}</p>
+            <pre>{entry.text}</pre>
+          </article>
+        {/each}
+      </div>
     {:else}
       <div class="agent-empty-state">Waiting for agent events from the app event stream. No runtime or commands are connected yet.</div>
     {/if}
@@ -370,6 +388,31 @@
     display: flex;
     min-height: 100%;
     padding: 12px 0;
+  }
+
+  .agent-output-list {
+    display: grid;
+    gap: 12px;
+  }
+
+  .agent-output-message {
+    background: rgb(45, 47, 58);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 12px;
+  }
+
+  .agent-output-message.pi-message {
+    background: rgb(62, 64, 72);
+  }
+
+  .agent-output-message p {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    margin: 0 0 6px;
+    text-transform: uppercase;
   }
 
   pre {
