@@ -53,8 +53,6 @@
       <span>Ready: {readyCount}</span>
       {#if data.graph.graph.hasCycle}
         <span class="stats-warning">Dependency cycle detected</span>
-      {:else}
-        <span>Critical path: {data.graph.graph.criticalPath.length} edges</span>
       {/if}
     </div>
   </section>

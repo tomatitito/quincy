@@ -12,7 +12,7 @@ If ticket `B` has `deps: [A]`, Quincy creates a directed edge:
 A → B
 ```
 
-Only dependencies that reference existing tickets participate in graph layout and critical-path calculation. Missing dependency IDs affect readiness elsewhere, but they are not graph nodes.
+Only dependencies that reference existing tickets participate in graph layout. Missing dependency IDs affect readiness elsewhere, but they are not graph nodes.
 
 ## Cycle handling
 
@@ -55,16 +55,6 @@ A → C
 
 It hides the direct `A → C` edge because the indirect path already preserves the same reachability. This changes only the rendered edge set; the underlying dependency graph remains unchanged.
 
-## Critical path
-
-The critical path is the longest path in the full dependency graph by edge count.
-
-Important details:
-
-- It is calculated from the full graph, not just the transitive-reduced rendered edges.
-- The highlighted path can be toggled in the UI.
-- If there are no dependency edges, the critical path length is `0`.
-
 ## Presentation
 
 The graph view positions cards from the derived layout:
@@ -73,4 +63,3 @@ The graph view positions cards from the derived layout:
 - Top-to-bottom mode maps `layer` to y-position and `order` to x-position.
 - Layer bands are drawn behind cards to make the dependency stages visible.
 - Dependency edges are drawn as curved SVG paths from dependency to dependent.
-- Critical nodes and critical edges are highlighted when critical-path highlighting is enabled.

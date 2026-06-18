@@ -389,10 +389,6 @@ select:focus-visible {
   color: var(--body-bg);
 }
 
-.checkbox.compact {
-  font-size: 10px;
-}
-
 .graph-legend {
   color: var(--muted);
   font-size: 10px;
@@ -413,10 +409,6 @@ select:focus-visible {
 
 .swatch.dep {
   background: var(--border);
-}
-
-.swatch.critical {
-  background: var(--accent);
 }
 
 .graph-canvas {
@@ -454,12 +446,6 @@ select:focus-visible {
   stroke-width: 2;
 }
 
-.graph-edge.critical {
-  color: var(--accent);
-  opacity: 1;
-  stroke-width: 3;
-}
-
 .graph-ticket-card {
   background: var(--container-bg);
   border: 1px solid var(--dim);
@@ -478,10 +464,6 @@ select:focus-visible {
 .graph-ticket-card.selected {
   background: var(--selected-bg);
   border-color: var(--accent);
-}
-
-.graph-ticket-card.critical {
-  box-shadow: 0 0 0 1px var(--accent) inset;
 }
 
 .graph-ticket-card.ready .graph-ticket-card-meta span:last-child {

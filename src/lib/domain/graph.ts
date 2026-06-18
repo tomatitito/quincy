@@ -1,4 +1,4 @@
-/* eslint-disable sensors/max-file-lines, sensors/max-function-lines, sensors/no-domain-primitives */
+/* eslint-disable sensors/max-function-lines, sensors/no-domain-primitives */
 import type { TicketView } from "$lib/domain/tickets";
 
 export interface GraphCycle {
@@ -10,14 +10,12 @@ export interface GraphDependencyEdge {
   id: string;
   source: string;
   target: string;
-  isCritical: boolean;
 }
 
 export interface GraphNodeLayout {
   id: string;
   layer: number;
   order: number;
-  critical: boolean;
 }
 
 export interface GraphDerivation {
@@ -25,11 +23,6 @@ export interface GraphDerivation {
   cycle?: GraphCycle;
   nodes: GraphNodeLayout[];
   dependencyEdges: GraphDependencyEdge[];
-  criticalPath: {
-    nodeIds: string[];
-    edgeIds: string[];
-    length: number;
-  };
 }
 
 function compareIds(a: string, b: string): number {
@@ -132,7 +125,7 @@ function deriveLayers(nodes: string[], incoming: Map<string, string[]>, outgoing
 
   return order.map((nodeId) => {
     const layer = longestIncomingDepth.get(nodeId) ?? 0;
-    return { id: nodeId, layer, order: layerGroups.get(layer)?.indexOf(nodeId) ?? 0, critical: false };
+    return { id: nodeId, layer, order: layerGroups.get(layer)?.indexOf(nodeId) ?? 0 };
   });
 }
 
@@ -157,57 +150,9 @@ function deriveReducedEdges(nodes: string[], outgoing: Map<string, string[]>): G
     .flatMap((source) =>
       (outgoing.get(source) ?? [])
         .filter((target) => !hasAlternatePath(source, target, outgoing))
-        .map((target) => ({ id: edgeId(source, target), source, target, isCritical: false })),
+        .map((target) => ({ id: edgeId(source, target), source, target })),
     )
     .sort((left, right) => left.id.localeCompare(right.id));
-}
-
-function deriveCriticalPath(nodes: string[], incoming: Map<string, string[]>, outgoing: Map<string, string[]>): GraphDerivation["criticalPath"] {
-  const distances = new Map<string, number>();
-  const previous = new Map<string, string | undefined>();
-  const remaining = new Map<string, number>();
-  const ready: string[] = [];
-
-  for (const nodeId of nodes) {
-    remaining.set(nodeId, incoming.get(nodeId)?.length ?? 0);
-    distances.set(nodeId, 0);
-    if ((incoming.get(nodeId)?.length ?? 0) === 0) ready.push(nodeId);
-  }
-  ready.sort(compareIds);
-
-  while (ready.length > 0) {
-    const nodeId = ready.shift();
-    if (nodeId === undefined) break;
-    for (const nextId of outgoing.get(nodeId) ?? []) {
-      const candidateDistance = (distances.get(nodeId) ?? 0) + 1;
-      if (candidateDistance > (distances.get(nextId) ?? 0)) {
-        distances.set(nextId, candidateDistance);
-        previous.set(nextId, nodeId);
-      }
-      const nextRemaining = (remaining.get(nextId) ?? 0) - 1;
-      remaining.set(nextId, nextRemaining);
-      if (nextRemaining === 0) {
-        ready.push(nextId);
-        ready.sort(compareIds);
-      }
-    }
-  }
-
-  let endNode = nodes[0];
-  for (const nodeId of nodes) {
-    if ((distances.get(nodeId) ?? 0) > (distances.get(endNode) ?? 0)) endNode = nodeId;
-  }
-  if (!endNode) return { nodeIds: [], edgeIds: [], length: 0 };
-
-  const nodeIds: string[] = [];
-  let current: string | undefined = endNode;
-  while (current) {
-    nodeIds.push(current);
-    current = previous.get(current);
-  }
-  nodeIds.reverse();
-
-  return { nodeIds, edgeIds: nodeIds.slice(1).map((nodeId, index) => edgeId(nodeIds[index], nodeId)), length: Math.max(0, nodeIds.length - 1) };
 }
 
 export function deriveGraph(tickets: TicketView[]): GraphDerivation {
@@ -215,17 +160,12 @@ export function deriveGraph(tickets: TicketView[]): GraphDerivation {
   const cycle = detectCycle(nodes, outgoing);
 
   if (cycle) {
-    return { hasCycle: true, cycle, nodes: [], dependencyEdges: [], criticalPath: { nodeIds: [], edgeIds: [], length: 0 } };
+    return { hasCycle: true, cycle, nodes: [], dependencyEdges: [] };
   }
-
-  const criticalPath = deriveCriticalPath(nodes, incoming, outgoing);
-  const criticalNodeIds = new Set(criticalPath.nodeIds);
-  const criticalEdgeIds = new Set(criticalPath.edgeIds);
 
   return {
     hasCycle: false,
-    nodes: deriveLayers(nodes, incoming, outgoing).map((node) => ({ ...node, critical: criticalNodeIds.has(node.id) })),
-    dependencyEdges: deriveReducedEdges(nodes, outgoing).map((edge) => ({ ...edge, isCritical: criticalEdgeIds.has(edge.id) })),
-    criticalPath,
+    nodes: deriveLayers(nodes, incoming, outgoing),
+    dependencyEdges: deriveReducedEdges(nodes, outgoing),
   };
 }

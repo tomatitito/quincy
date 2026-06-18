@@ -9,7 +9,6 @@
 
   let { tickets, graph }: Props = $props();
   let direction = $state<"lr" | "tb">("lr");
-  let showCriticalPath = $state(true);
   let selectedId = $state<string | undefined>();
 
   const cardWidth = 220;
@@ -19,7 +18,6 @@
   const orderGap = 28;
 
   const ticketById = $derived(new Map(tickets.map((ticket) => [ticket.id, ticket])));
-  const criticalEdgeIds = $derived(new Set(graph.criticalPath.edgeIds));
   const positionedNodes = $derived(
     graph.nodes.map((node) => ({
       ...node,
@@ -57,10 +55,6 @@
       <button type="button" class:active={direction === "lr"} aria-pressed={direction === "lr"} onclick={() => (direction = "lr")}>Left → right</button>
       <button type="button" class:active={direction === "tb"} aria-pressed={direction === "tb"} onclick={() => (direction = "tb")}>Top → bottom</button>
     </div>
-    <label class="checkbox compact">
-      <input type="checkbox" bind:checked={showCriticalPath} />
-      highlight critical path
-    </label>
   </div>
 
   {#if graph.hasCycle}
@@ -76,7 +70,6 @@
   {:else}
     <div class="graph-legend">
       <span><i class="swatch dep"></i> direct dependency</span>
-      {#if showCriticalPath}<span><i class="swatch critical"></i> critical path</span>{/if}
     </div>
     <div class="graph-canvas">
       <div class="graph-stage" style={`width: ${width}px; height: ${height}px;`}>
@@ -103,7 +96,7 @@
             {@const source = positionedNodeById.get(edge.source)}
             {@const target = positionedNodeById.get(edge.target)}
             {#if source && target}
-              <path class:critical={showCriticalPath && criticalEdgeIds.has(edge.id)} class="graph-edge dependency" d={dependencyPath(source, target)} marker-end="url(#graph-arrow-dep)" />
+              <path class="graph-edge dependency" d={dependencyPath(source, target)} marker-end="url(#graph-arrow-dep)" />
             {/if}
           {/each}
         </svg>
@@ -113,7 +106,6 @@
           {#if ticket}
             <button
               type="button"
-              class:critical={showCriticalPath && node.critical}
               class:ready={ticket.ready}
               class:selected={selectedId === ticket.id}
               class="graph-ticket-card"
