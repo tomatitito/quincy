@@ -1,14 +1,81 @@
 <script lang="ts">
   import type { KanbanColumn } from "$lib/domain/tickets";
+  import { epicFilterState, setEpicFilterScope, setEpicFilterStatusVisibility, setSelectedEpicIds } from "$lib/infrastructure/inbound/browser/epicFilterState";
+  import type { EpicFilterScope, EpicFilterStatusVisibility } from "$lib/infrastructure/inbound/browser/epicFilterState";
 
   interface Props {
     columns: KanbanColumn[];
   }
 
   let { columns }: Props = $props();
+
+  const epicTickets = $derived(
+    Array.from(
+      new Map(
+        columns
+          .flatMap((column) => column.tickets)
+          .filter((ticket) => ticket.type === "epic")
+          .map((ticket) => [ticket.id, ticket] as const),
+      ).values(),
+    ).sort((left, right) => left.id.localeCompare(right.id)),
+  );
+
+  function updateSelectedEpicIds(event: Event) {
+    const select = event.currentTarget as HTMLSelectElement;
+    setSelectedEpicIds(Array.from(select.selectedOptions, (option) => option.value));
+  }
+
+  function setScope(event: Event) {
+    setEpicFilterScope((event.currentTarget as HTMLInputElement).value as EpicFilterScope);
+  }
+
+  function setStatusVisibility(event: Event) {
+    setEpicFilterStatusVisibility((event.currentTarget as HTMLSelectElement).value as EpicFilterStatusVisibility);
+  }
 </script>
 
 <section aria-label="Kanban board" class="kanban-board">
+  <aside aria-label="Kanban epic filters" class="kanban-filter-sidebar">
+    <header>
+      <h2>Filter</h2>
+      <span>Not applied yet</span>
+    </header>
+
+    <fieldset class="kanban-filter-group">
+      <legend>Scope</legend>
+      <label>
+        <input type="radio" name="kanban-epic-scope" value="all" checked={$epicFilterState.scope === "all"} onchange={setScope} />
+        All tickets
+      </label>
+      <label>
+        <input type="radio" name="kanban-epic-scope" value="epics" checked={$epicFilterState.scope === "epics"} onchange={setScope} />
+        Epics only
+      </label>
+      <label>
+        <input type="radio" name="kanban-epic-scope" value="selected" checked={$epicFilterState.scope === "selected"} onchange={setScope} />
+        Selected epic(s)
+      </label>
+    </fieldset>
+
+    <label class="kanban-filter-control">
+      <span>Status</span>
+      <select value={$epicFilterState.statusVisibility} onchange={setStatusVisibility}>
+        <option value="open">Open only</option>
+        <option value="all">Open + closed</option>
+      </select>
+    </label>
+
+    <label class="kanban-filter-control">
+      <span>Epics</span>
+      <select multiple size={Math.min(6, Math.max(3, epicTickets.length))} onchange={updateSelectedEpicIds}>
+        {#each epicTickets as ticket}
+          <option value={ticket.id} selected={$epicFilterState.selectedEpicIds.includes(ticket.id)}>{ticket.id} — {ticket.title}</option>
+        {:else}
+          <option disabled>No epics found</option>
+        {/each}
+      </select>
+    </label>
+  </aside>
   {#each columns as column}
     <article class="kanban-column">
       <header>
