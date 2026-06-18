@@ -1,6 +1,8 @@
 <script lang="ts">
   import type { GraphDerivation } from "$lib/domain/graph";
   import type { TicketView } from "$lib/domain/tickets";
+  import { epicFilterState, setEpicFilterScope, setEpicFilterStatusVisibility, setSelectedEpicIds } from "$lib/infrastructure/inbound/browser/epicFilterState";
+  import type { EpicFilterScope, EpicFilterStatusVisibility } from "$lib/infrastructure/inbound/browser/epicFilterState";
 
   interface Props {
     tickets: TicketView[];
@@ -18,6 +20,7 @@
   const orderGap = 28;
 
   const ticketById = $derived(new Map(tickets.map((ticket) => [ticket.id, ticket])));
+  const epicTickets = $derived(tickets.filter((ticket) => ticket.type === "epic").sort((left, right) => left.id.localeCompare(right.id)));
   const positionedNodes = $derived(
     graph.nodes.map((node) => ({
       ...node,
@@ -29,6 +32,11 @@
   const width = $derived(Math.max(720, positionedNodes.reduce((value, node) => Math.max(value, node.x + cardWidth + padding), 0)));
   const height = $derived(Math.max(360, positionedNodes.reduce((value, node) => Math.max(value, node.y + cardHeight + padding), 0)));
   const layers = $derived(Array.from(new Set(graph.nodes.map((node) => node.layer))).sort((left, right) => left - right));
+
+  function updateSelectedEpicIds(event: Event) {
+    const select = event.currentTarget as HTMLSelectElement;
+    setSelectedEpicIds(Array.from(select.selectedOptions, (option) => option.value));
+  }
 
   function dependencyPath(source: (typeof positionedNodes)[number], target: (typeof positionedNodes)[number]) {
     if (direction === "lr") {
@@ -55,6 +63,34 @@
       <button type="button" class:active={direction === "lr"} aria-pressed={direction === "lr"} onclick={() => (direction = "lr")}>Left → right</button>
       <button type="button" class:active={direction === "tb"} aria-pressed={direction === "tb"} onclick={() => (direction = "tb")}>Top → bottom</button>
     </div>
+
+    <label class="graph-filter-control">
+      <span>Scope</span>
+      <select value={$epicFilterState.scope} onchange={(event) => setEpicFilterScope((event.currentTarget as HTMLSelectElement).value as EpicFilterScope)}>
+        <option value="all">All tickets</option>
+        <option value="epics">Epics only</option>
+        <option value="selected">Selected epic(s)</option>
+      </select>
+    </label>
+
+    <label class="graph-filter-control">
+      <span>Status</span>
+      <select value={$epicFilterState.statusVisibility} onchange={(event) => setEpicFilterStatusVisibility((event.currentTarget as HTMLSelectElement).value as EpicFilterStatusVisibility)}>
+        <option value="open">Open only</option>
+        <option value="all">Open + closed</option>
+      </select>
+    </label>
+
+    {#if $epicFilterState.scope === "selected"}
+      <label class="graph-filter-control graph-filter-control-wide">
+        <span>Epics</span>
+        <select multiple size={Math.min(4, Math.max(2, epicTickets.length))} onchange={updateSelectedEpicIds}>
+          {#each epicTickets as ticket}
+            <option value={ticket.id} selected={$epicFilterState.selectedEpicIds.includes(ticket.id)}>{ticket.id} — {ticket.title}</option>
+          {/each}
+        </select>
+      </label>
+    {/if}
   </div>
 
   {#if graph.hasCycle}
