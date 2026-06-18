@@ -1,6 +1,6 @@
 ---
 id: qui-4epc
-status: open
+status: closed
 deps: [qui-37bh]
 links: []
 created: 2026-05-24T00:00:00Z
