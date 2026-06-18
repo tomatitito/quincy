@@ -1,7 +1,9 @@
 import type { TicketId, TicketView } from "$lib/domain/tickets";
+import { filterTicketViewsByVisibility } from "$lib/domain/ticketVisibility";
+import type { TicketStatusVisibility, TicketVisibilityScope } from "$lib/domain/ticketVisibility";
 
-export type GraphFilterScope = "all" | "epics" | "selected";
-export type GraphStatusVisibility = "open" | "all";
+export type GraphFilterScope = TicketVisibilityScope;
+export type GraphStatusVisibility = TicketStatusVisibility;
 
 export interface GraphFilterState {
   scope: GraphFilterScope;
@@ -10,25 +12,5 @@ export interface GraphFilterState {
 }
 
 export function filterTicketsForGraph(tickets: TicketView[], filter: GraphFilterState): TicketView[] {
-  const selectedIds = selectedTreeIds(tickets, filter.selectedEpicIds);
-  const scopedTickets = tickets.filter((ticket) => matchesScope(ticket, filter, selectedIds));
-  if (filter.statusVisibility === "all") return scopedTickets;
-  return scopedTickets.filter((ticket) => ticket.status !== "closed");
-}
-
-function matchesScope(ticket: TicketView, filter: GraphFilterState, selectedIds: Set<TicketId>) {
-  if (filter.scope === "all") return true;
-  if (filter.scope === "epics") return ticket.type === "epic";
-  return selectedIds.has(ticket.id);
-}
-
-function selectedTreeIds(tickets: TicketView[], selectedEpicIds: TicketId[]): Set<TicketId> {
-  const visibleIds = new Set<TicketId>(selectedEpicIds);
-  let previousSize = 0;
-  while (visibleIds.size !== previousSize) {
-    previousSize = visibleIds.size;
-    for (const ticket of tickets) if (ticket.parent && visibleIds.has(ticket.parent)) visibleIds.add(ticket.id);
-  }
-
-  return visibleIds;
+  return filterTicketViewsByVisibility(tickets, filter);
 }

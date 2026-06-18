@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { KanbanColumn } from "$lib/domain/tickets";
+  import { filterKanbanColumnsByVisibility } from "$lib/domain/ticketVisibility";
   import { epicFilterState, setEpicFilterScope, setEpicFilterStatusVisibility, setSelectedEpicIds } from "$lib/infrastructure/inbound/browser/epicFilterState";
   import type { EpicFilterScope, EpicFilterStatusVisibility } from "$lib/infrastructure/inbound/browser/epicFilterState";
 
@@ -9,15 +10,11 @@
 
   let { columns }: Props = $props();
 
+  const tickets = $derived(columns.flatMap((column) => column.tickets));
+  const filteredColumns = $derived(filterKanbanColumnsByVisibility(columns, $epicFilterState));
+  const visibleTicketCount = $derived(filteredColumns.reduce((count, column) => count + column.tickets.length, 0));
   const epicTickets = $derived(
-    Array.from(
-      new Map(
-        columns
-          .flatMap((column) => column.tickets)
-          .filter((ticket) => ticket.type === "epic")
-          .map((ticket) => [ticket.id, ticket] as const),
-      ).values(),
-    ).sort((left, right) => left.id.localeCompare(right.id)),
+    Array.from(new Map(tickets.filter((ticket) => ticket.type === "epic").map((ticket) => [ticket.id, ticket] as const)).values()).sort((left, right) => left.id.localeCompare(right.id)),
   );
 
   function updateSelectedEpicIds(event: Event) {
@@ -38,7 +35,7 @@
   <aside aria-label="Kanban epic filters" class="kanban-filter-sidebar">
     <header>
       <h2>Filter</h2>
-      <span>Not applied yet</span>
+      <span>{visibleTicketCount} visible</span>
     </header>
 
     <fieldset class="kanban-filter-group">
@@ -76,7 +73,7 @@
       </select>
     </label>
   </aside>
-  {#each columns as column}
+  {#each filteredColumns as column}
     <article class="kanban-column">
       <header>
         <h2>{column.id.replace("_", " ")}</h2>

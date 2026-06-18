@@ -1,6 +1,6 @@
 ---
 id: qui-f6uk
-status: open
+status: closed
 deps: [qui-qypz, qui-h9oi]
 links: []
 created: 2026-06-18T20:31:03Z
