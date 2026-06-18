@@ -1,6 +1,6 @@
 ---
 id: qui-jdu6
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-18T20:31:03Z
