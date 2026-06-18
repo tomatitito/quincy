@@ -23,6 +23,7 @@
   const filteredTickets = $derived(filterTicketsForGraph(tickets, $epicFilterState));
   const renderedGraph = $derived(isUnfilteredGraph() ? graph : deriveGraph(filteredTickets));
   const ticketById = $derived(new Map(filteredTickets.map((ticket) => [ticket.id, ticket])));
+  const selectedFilterEpicIds = $derived(new Set($epicFilterState.scope === "selected" ? $epicFilterState.selectedEpicIds : []));
   const epicTickets = $derived(tickets.filter((ticket) => ticket.type === "epic").sort((left, right) => left.id.localeCompare(right.id)));
   const positionedNodes = $derived(
     renderedGraph.nodes.map((node) => ({
@@ -151,6 +152,7 @@
               type="button"
               class:ready={ticket.ready}
               class:selected={selectedId === ticket.id}
+              class:filtered-epic-context={ticket.type === "epic" && selectedFilterEpicIds.has(ticket.id)}
               class="graph-ticket-card"
               style={`left: ${node.x}px; top: ${node.y}px; width: ${cardWidth}px; height: ${cardHeight}px;`}
               onclick={() => (selectedId = ticket.id)}

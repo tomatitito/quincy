@@ -328,6 +328,13 @@ select:focus-visible {
   background: var(--selected-bg);
 }
 
+.kanban-card.filtered-epic-context {
+  background: transparent;
+  border-style: dashed;
+  color: var(--muted);
+  opacity: 0.78;
+}
+
 .kanban-card.selected {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent) inset;
@@ -554,6 +561,19 @@ select:focus-visible {
 .graph-ticket-card.selected {
   background: var(--selected-bg);
   border-color: var(--accent);
+}
+
+.graph-ticket-card.filtered-epic-context {
+  background: rgba(255, 255, 255, 0.018);
+  border-style: dashed;
+  color: var(--muted);
+  opacity: 0.76;
+}
+
+.graph-ticket-card.filtered-epic-context:hover,
+.graph-ticket-card.filtered-epic-context.selected {
+  border-color: var(--accent);
+  opacity: 0.88;
 }
 
 .graph-ticket-card.ready .graph-ticket-card-meta span:last-child {

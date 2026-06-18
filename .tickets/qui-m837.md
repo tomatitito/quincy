@@ -1,6 +1,6 @@
 ---
 id: qui-m837
-status: open
+status: closed
 deps: [qui-7ffr, qui-f6uk]
 links: []
 created: 2026-06-18T20:31:03Z

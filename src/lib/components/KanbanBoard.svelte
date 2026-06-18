@@ -13,6 +13,7 @@
   const tickets = $derived(columns.flatMap((column) => column.tickets));
   const filteredColumns = $derived(filterKanbanColumnsByVisibility(columns, $epicFilterState));
   const visibleTicketCount = $derived(filteredColumns.reduce((count, column) => count + column.tickets.length, 0));
+  const selectedFilterEpicIds = $derived(new Set($epicFilterState.scope === "selected" ? $epicFilterState.selectedEpicIds : []));
   const epicTickets = $derived(
     Array.from(new Map(tickets.filter((ticket) => ticket.type === "epic").map((ticket) => [ticket.id, ticket] as const)).values()).sort((left, right) => left.id.localeCompare(right.id)),
   );
@@ -81,7 +82,7 @@
       </header>
       <div class="kanban-cards">
         {#each column.tickets as ticket}
-          <div class="kanban-card">
+          <div class:filtered-epic-context={ticket.type === "epic" && selectedFilterEpicIds.has(ticket.id)} class="kanban-card">
             <div class="kanban-card-header">
               <strong>{ticket.id}</strong>
               <span class={`status-badge status-${ticket.status.replace("_", "-")}`}>P{ticket.priority}</span>
