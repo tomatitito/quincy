@@ -11,10 +11,17 @@
   let inputText = $state("");
   let activeSessionId = $state<string>();
   let commandBusy = $state(false);
+  let sessionListBusy = $state(false);
+  let sessionListMessage = $state("Loading repository sessions…");
+  let sessionSummaries = $state<AgentSessionSummary[]>([]);
   let output = $state<AgentOutput[]>([]);
 
   const statusLabel = $derived(status === "empty" ? "Not connected" : status);
   const canSubmitInput = $derived(inputText.length > 0 && !commandBusy);
+
+  $effect(() => {
+    void loadSessionSummaries();
+  });
 
   $effect(() => {
     if (appEvents === undefined) return;
@@ -57,11 +64,29 @@
     return true;
   }
 
+  async function loadSessionSummaries() {
+    sessionListBusy = true;
+    try {
+      const response = await fetch("/api/agent/sessions");
+      if (!response.ok) {
+        sessionListMessage = "Agent sessions could not be loaded.";
+        return;
+      }
+      sessionSummaries = parseSessionSummaries(await response.json());
+      sessionListMessage = sessionSummaries.length === 0 ? "No repository sessions found." : "";
+    } catch {
+      sessionListMessage = "Agent sessions could not be loaded.";
+    } finally {
+      sessionListBusy = false;
+    }
+  }
+
   async function startSession() {
     const result = await sendCommand("/api/agent/start", {});
     if (result === undefined) return undefined;
     activeSessionId = result.sessionId;
     commandMessage = result.message;
+    void loadSessionSummaries();
     return result;
   }
 
@@ -113,6 +138,13 @@
     message: string;
   }
 
+  interface AgentSessionSummary {
+    id: string;
+    label: string;
+    preview: string;
+    lastUsedAt: string;
+  }
+
   type AgentOutputRole = "user" | "assistant";
 
   interface AgentOutput {
@@ -139,6 +171,27 @@
     const message = stringFrom(result.message);
     if (sessionId === undefined || message === undefined) return undefined;
     return { accepted: true, sessionId, message };
+  }
+
+  function parseSessionSummaries(value: unknown): AgentSessionSummary[] {
+    if (!Array.isArray(value)) return [];
+    return value.map(parseSessionSummary).filter((summary): summary is AgentSessionSummary => summary !== undefined);
+  }
+
+  function parseSessionSummary(value: unknown): AgentSessionSummary | undefined {
+    const summary = asRecord(value);
+    const id = stringFrom(summary?.id);
+    const label = stringFrom(summary?.label);
+    const preview = stringFrom(summary?.preview);
+    const lastUsedAt = stringFrom(summary?.lastUsedAt);
+    if (id === undefined || label === undefined || preview === undefined || lastUsedAt === undefined) return undefined;
+    return { id, label, preview, lastUsedAt };
+  }
+
+  function formatLastUsed(value: string): string {
+    const date = new Date(value);
+    if (Number.isNaN(date.valueOf())) return value;
+    return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date);
   }
 
   function toStatus(value: unknown): AgentStatus | undefined {
@@ -171,44 +224,69 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <section class="agent-panel" aria-label="Agent panel">
-  <header>
-    <div>
-      <p class="eyebrow">Agent</p>
-      <h2>Session activity</h2>
+  <aside class="agent-session-sidebar" aria-label="Repository agent sessions">
+    <div class="sidebar-header">
+      <p class="eyebrow">Sessions</p>
+      <button type="button" onclick={loadSessionSummaries} disabled={sessionListBusy}>Refresh</button>
     </div>
-    <div class="agent-header-actions">
-      <button type="button" onclick={startSession} disabled={commandBusy}>Start session</button>
-      <span class:running={status === "running"} class:completed={status === "completed"} class:failed={status === "failed"} class:cancelled={status === "cancelled"}>{statusLabel}</span>
-    </div>
-  </header>
 
-  <p class="agent-message">{message}</p>
-
-  <div class="agent-transcript" data-agent-transcript-scroll>
-    {#if output.length > 0}
-      <div class="agent-output-list" aria-label="Agent output">
-        {#each output as entry (entry.key ?? entry.text)}
-          <article class="agent-output-message" class:user-message={entry.role === "user"} class:pi-message={entry.role === "assistant"}>
-            <p>{entry.role === "user" ? "You" : "Pi"}</p>
-            <pre>{entry.text}</pre>
+    {#if sessionSummaries.length > 0}
+      <div class="agent-session-list">
+        {#each sessionSummaries as session (session.id)}
+          <article class="agent-session-row">
+            <h3>{session.label}</h3>
+            {#if session.preview.length > 0 && session.preview !== session.label}
+              <p>{session.preview}</p>
+            {/if}
+            <time datetime={session.lastUsedAt}>{formatLastUsed(session.lastUsedAt)}</time>
           </article>
         {/each}
       </div>
     {:else}
-      <div class="agent-empty-state">Waiting for agent events from the app event stream. No runtime or commands are connected yet.</div>
+      <p class="agent-session-message">{sessionListMessage}</p>
     {/if}
-  </div>
+  </aside>
 
-  <section class="agent-commands" aria-label="Agent commands">
-    <p>{commandMessage}</p>
-    <div class="agent-chat-input">
-      <label>
-        <span class="visually-hidden">Input</span>
-        <textarea bind:value={inputText} disabled={commandBusy} placeholder="Send input to the active agent session"></textarea>
-      </label>
-      <button type="button" onclick={sendInput} disabled={!canSubmitInput} aria-label="Send input">↑</button>
+  <div class="agent-session-activity">
+    <header>
+      <div>
+        <p class="eyebrow">Agent</p>
+        <h2>Session activity</h2>
+      </div>
+      <div class="agent-header-actions">
+        <button type="button" onclick={startSession} disabled={commandBusy}>Start session</button>
+        <span class:running={status === "running"} class:completed={status === "completed"} class:failed={status === "failed"} class:cancelled={status === "cancelled"}>{statusLabel}</span>
+      </div>
+    </header>
+
+    <p class="agent-message">{message}</p>
+
+    <div class="agent-transcript" data-agent-transcript-scroll>
+      {#if output.length > 0}
+        <div class="agent-output-list" aria-label="Agent output">
+          {#each output as entry (entry.key ?? entry.text)}
+            <article class="agent-output-message" class:user-message={entry.role === "user"} class:pi-message={entry.role === "assistant"}>
+              <p>{entry.role === "user" ? "You" : "Pi"}</p>
+              <pre>{entry.text}</pre>
+            </article>
+          {/each}
+        </div>
+      {:else}
+        <div class="agent-empty-state">Waiting for agent events from the app event stream. No runtime or commands are connected yet.</div>
+      {/if}
     </div>
-  </section>
+
+    <section class="agent-commands" aria-label="Agent commands">
+      <p>{commandMessage}</p>
+      <div class="agent-chat-input">
+        <label>
+          <span class="visually-hidden">Input</span>
+          <textarea bind:value={inputText} disabled={commandBusy} placeholder="Send input to the active agent session"></textarea>
+        </label>
+        <button type="button" onclick={sendInput} disabled={!canSubmitInput} aria-label="Send input">↑</button>
+      </div>
+    </section>
+  </div>
 </section>
 
 <style>
@@ -216,11 +294,78 @@
     background: var(--container-bg);
     display: grid;
     font-size: 13px;
-    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
     height: 100%;
     line-height: 1.45;
     min-height: 0;
     overflow: hidden;
+  }
+
+  .agent-session-activity {
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .agent-session-sidebar {
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .sidebar-header {
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+    padding: 12px 14px;
+  }
+
+  .agent-session-list {
+    display: grid;
+    gap: 8px;
+    overflow-y: auto;
+    padding: 12px;
+  }
+
+  .agent-session-row {
+    background: rgb(45, 47, 58);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    display: grid;
+    gap: 6px;
+    padding: 10px;
+  }
+
+  .agent-session-row h3 {
+    color: var(--text);
+    font-size: 13px;
+    margin: 0;
+  }
+
+  .agent-session-row p,
+  .agent-session-row time,
+  .agent-session-message {
+    color: var(--muted);
+    margin: 0;
+  }
+
+  .agent-session-row p {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .agent-session-row time {
+    font-size: 11px;
+  }
+
+  .agent-session-message {
+    padding: 12px;
   }
 
   header {
@@ -435,6 +580,16 @@
   }
 
   @media (max-width: 760px) {
+    .agent-panel {
+      grid-template-columns: 1fr;
+      grid-template-rows: minmax(140px, 32%) minmax(0, 1fr);
+    }
+
+    .agent-session-sidebar {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      border-right: 0;
+    }
+
     header {
       padding: 10px 12px;
     }
@@ -472,6 +627,7 @@
   @media (max-width: 420px) {
     .agent-panel {
       font-size: 12px;
+      grid-template-rows: minmax(120px, 30%) minmax(0, 1fr);
     }
 
     header {

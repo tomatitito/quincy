@@ -1,18 +1,23 @@
 import { randomUUID } from "node:crypto";
+import { getAgentSessionSummaries } from "$lib/application/getAgentSessionSummaries";
 import { sendAgentInput } from "$lib/application/sendAgentInput";
 import { startAgentSession } from "$lib/application/startAgentSession";
 import { stopAgentSession } from "$lib/application/stopAgentSession";
 import { getKanbanView } from "$lib/application/getKanbanView";
 import { createConfigProvider } from "$lib/infrastructure/outbound/config";
 import { createPiRuntimeRepository } from "$lib/infrastructure/outbound/piRuntimeRepository";
+import { createPiSessionSummaryRepository } from "$lib/infrastructure/outbound/piSessionSummaryRepository";
 import { publishAppEvent } from "$lib/infrastructure/outbound/appEventHub";
 import { createTicketFileRepository } from "$lib/infrastructure/outbound/ticketFileRepository";
 
-const agentRepository = createPiRuntimeRepository({ createSessionId: randomUUID, cwd: process.cwd(), publishEvent: publishAppEvent });
+const observedRepositoryPath = process.cwd();
+const agentRepository = createPiRuntimeRepository({ createSessionId: randomUUID, cwd: observedRepositoryPath, publishEvent: publishAppEvent });
+const agentSessionSummaryRepository = createPiSessionSummaryRepository({ cwd: observedRepositoryPath });
 
 export async function handleApiRequest(request: Request): Promise<Response> {
   const path = new URL(request.url).pathname;
   if (request.method === "GET" && path.endsWith("/kanban")) return Response.json(await loadKanban());
+  if (request.method === "GET" && path.endsWith("/agent/sessions")) return Response.json(await getAgentSessionSummaries(agentSessionSummaryRepository));
   if (request.method === "POST" && path.endsWith("/agent/start")) return Response.json(await handleAgentStart(request));
   if (request.method === "POST" && path.endsWith("/agent/stop")) return Response.json(await handleAgentStop(request));
   if (request.method === "POST" && path.endsWith("/agent/input")) return Response.json(await handleAgentInput(request));

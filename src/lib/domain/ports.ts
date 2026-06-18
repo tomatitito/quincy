@@ -8,6 +8,16 @@ export type AgentSessionId = string;
 export type AgentInputText = string;
 export type AgentCommandMessage = string;
 export type AgentCommandAccepted = boolean;
+export type AgentSessionLabel = string;
+export type AgentSessionPreview = string;
+export type AgentSessionLastUsedAt = string;
+
+export interface AgentSessionSummary {
+  id: AgentSessionId;
+  label: AgentSessionLabel;
+  preview: AgentSessionPreview;
+  lastUsedAt: AgentSessionLastUsedAt;
+}
 
 export interface StartAgentSessionCommand {
   prompt?: AgentInputText;
@@ -33,6 +43,8 @@ export interface AgentRepository {
   stop(command: StopAgentSessionCommand): Promise<AgentCommandResult>;
   sendInput(command: SendAgentInputCommand): Promise<AgentCommandResult>;
 }
+
+export type AgentSessionSummaryRepository = () => Promise<AgentSessionSummary[]>;
 
 export interface ProjectConfig {
   ticketDirectory: TicketDirectory;
