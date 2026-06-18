@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type { GraphDerivation } from "$lib/domain/graph";
+  import { deriveGraph, type GraphDerivation } from "$lib/domain/graph";
+  import { filterTicketsForGraph } from "$lib/domain/graphFilters";
   import type { TicketView } from "$lib/domain/tickets";
   import { epicFilterState, setEpicFilterScope, setEpicFilterStatusVisibility, setSelectedEpicIds } from "$lib/infrastructure/inbound/browser/epicFilterState";
   import type { EpicFilterScope, EpicFilterStatusVisibility } from "$lib/infrastructure/inbound/browser/epicFilterState";
@@ -19,10 +20,12 @@
   const layerGap = 112;
   const orderGap = 28;
 
-  const ticketById = $derived(new Map(tickets.map((ticket) => [ticket.id, ticket])));
+  const filteredTickets = $derived(filterTicketsForGraph(tickets, $epicFilterState));
+  const renderedGraph = $derived(isUnfilteredGraph() ? graph : deriveGraph(filteredTickets));
+  const ticketById = $derived(new Map(filteredTickets.map((ticket) => [ticket.id, ticket])));
   const epicTickets = $derived(tickets.filter((ticket) => ticket.type === "epic").sort((left, right) => left.id.localeCompare(right.id)));
   const positionedNodes = $derived(
-    graph.nodes.map((node) => ({
+    renderedGraph.nodes.map((node) => ({
       ...node,
       x: direction === "lr" ? padding + node.layer * (cardWidth + layerGap) : padding + node.order * (cardWidth + orderGap),
       y: direction === "lr" ? padding + node.order * (cardHeight + orderGap) : padding + node.layer * (cardHeight + layerGap),
@@ -31,11 +34,15 @@
   const positionedNodeById = $derived(new Map(positionedNodes.map((node) => [node.id, node])));
   const width = $derived(Math.max(720, positionedNodes.reduce((value, node) => Math.max(value, node.x + cardWidth + padding), 0)));
   const height = $derived(Math.max(360, positionedNodes.reduce((value, node) => Math.max(value, node.y + cardHeight + padding), 0)));
-  const layers = $derived(Array.from(new Set(graph.nodes.map((node) => node.layer))).sort((left, right) => left - right));
+  const layers = $derived(Array.from(new Set(renderedGraph.nodes.map((node) => node.layer))).sort((left, right) => left - right));
 
   function updateSelectedEpicIds(event: Event) {
     const select = event.currentTarget as HTMLSelectElement;
     setSelectedEpicIds(Array.from(select.selectedOptions, (option) => option.value));
+  }
+
+  function isUnfilteredGraph() {
+    return $epicFilterState.scope === "all" && $epicFilterState.statusVisibility === "all";
   }
 
   function dependencyPath(source: (typeof positionedNodes)[number], target: (typeof positionedNodes)[number]) {
@@ -93,15 +100,15 @@
     {/if}
   </div>
 
-  {#if graph.hasCycle}
+  {#if renderedGraph.hasCycle}
     <div class="graph-empty-state graph-cycle-state">
       <strong>Dependency cycle detected</strong>
       <p>Layered ordering is unavailable because the dependency graph is not acyclic.</p>
-      {#if graph.cycle}
-        <code>{graph.cycle.nodeIds.join(" → ")}</code>
+      {#if renderedGraph.cycle}
+        <code>{renderedGraph.cycle.nodeIds.join(" → ")}</code>
       {/if}
     </div>
-  {:else if graph.nodes.length === 0}
+  {:else if renderedGraph.nodes.length === 0}
     <div class="graph-empty-state">No tickets to render.</div>
   {:else}
     <div class="graph-legend">
@@ -128,7 +135,7 @@
             </g>
           {/each}
 
-          {#each graph.dependencyEdges as edge}
+          {#each renderedGraph.dependencyEdges as edge}
             {@const source = positionedNodeById.get(edge.source)}
             {@const target = positionedNodeById.get(edge.target)}
             {#if source && target}

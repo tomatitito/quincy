@@ -22,7 +22,8 @@ async function parseTicketFile(filePath: string): Promise<Ticket> {
 function parseTicket(markdown: string): Ticket {
   const [, metadataBlock = "", body = markdown] = markdown.match(frontmatterPattern) ?? [];
   const metadata = parseMetadata(metadataBlock);
-  return ticketFromMetadata(metadata, body);
+  const ticket = ticketFromMetadata(metadata, body);
+  return metadata.has("parent") ? { ...ticket, parent: metadata.get("parent") } : ticket;
 }
 
 function ticketFromMetadata(metadata: Map<string, string>, body: string): Ticket {

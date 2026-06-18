@@ -14,6 +14,7 @@ export interface Ticket {
   priority: TicketPriority;
   type: TicketType;
   deps: DependencyId[];
+  parent?: TicketId;
 }
 
 export interface TicketView extends Ticket {

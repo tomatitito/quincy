@@ -1,6 +1,6 @@
 ---
 id: qui-7ffr
-status: open
+status: closed
 deps: [qui-qypz, qui-hn1q]
 links: []
 created: 2026-06-18T20:31:03Z
