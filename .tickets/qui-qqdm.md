@@ -1,6 +1,6 @@
 ---
 id: qui-qqdm
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-06-16T00:00:00Z

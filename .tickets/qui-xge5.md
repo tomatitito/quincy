@@ -1,6 +1,6 @@
 ---
 id: qui-xge5
-status: in_progress
+status: closed
 deps: []
 links: []
 created: 2026-06-18T16:18:35Z
@@ -17,4 +17,3 @@ Add a sidebar to the Agent panel that lists agent sessions associated with the r
 ## Acceptance Criteria
 
 - Agent panel includes a session sidebar/list.\n- The initial data source uses Pi's session API for the observed repository cwd, not direct JSONL parsing.\n- Session summaries are represented in Quincy-owned provider-neutral contracts.\n- Rows show a useful session label/preview and last-used time.\n- Rows do not show user/avatar or project name.\n- UI remains prepared for additional session providers without coupling AgentPanel directly to Pi.\n- Existing active session streaming behavior is preserved.\n- bun run sensors all passes.
-
