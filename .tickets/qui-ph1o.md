@@ -1,6 +1,6 @@
 ---
 id: qui-ph1o
-status: open
+status: closed
 deps: [qui-y7ds]
 links: []
 created: 2026-06-03T00:00:00Z
