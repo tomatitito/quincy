@@ -13,6 +13,7 @@
 
   interface Props {
     data: {
+      projectPath: string;
       graph: GraphViewData;
       kanban: KanbanView;
     };
@@ -59,7 +60,7 @@
 </script>
 
 <div class="app-shell" data-viewport-mode={$viewportMode}>
-  <AppHeader {onRefresh} />
+  <AppHeader projectPath={data.projectPath} {onRefresh} />
 
   <section class="tabs" aria-label="Workspace summary">
     <nav class="tabs-nav" aria-label="Views">

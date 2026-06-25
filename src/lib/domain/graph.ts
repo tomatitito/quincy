@@ -1,9 +1,12 @@
 /* eslint-disable sensors/max-function-lines, sensors/no-domain-primitives */
-import type { TicketView } from "$lib/domain/tickets";
-
 export interface GraphCycle {
   nodeIds: string[];
   edgeIds: string[];
+}
+
+export interface GraphTicket {
+  id: string;
+  deps: string[];
 }
 
 export interface GraphDependencyEdge {
@@ -33,7 +36,7 @@ function edgeId(source: string, target: string): string {
   return `${source}->${target}`;
 }
 
-function buildAdjacency(tickets: TicketView[]) {
+function buildAdjacency(tickets: GraphTicket[]) {
   const ids = tickets.map((ticket) => ticket.id).sort(compareIds);
   const known = new Set(ids);
   const outgoing = new Map<string, string[]>();
@@ -155,7 +158,7 @@ function deriveReducedEdges(nodes: string[], outgoing: Map<string, string[]>): G
     .sort((left, right) => left.id.localeCompare(right.id));
 }
 
-export function deriveGraph(tickets: TicketView[]): GraphDerivation {
+export function deriveGraph(tickets: GraphTicket[]): GraphDerivation {
   const { nodes, outgoing, incoming } = buildAdjacency(tickets);
   const cycle = detectCycle(nodes, outgoing);
 

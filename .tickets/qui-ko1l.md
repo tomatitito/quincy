@@ -1,6 +1,6 @@
 ---
 id: qui-ko1l
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-05-24T00:00:00Z

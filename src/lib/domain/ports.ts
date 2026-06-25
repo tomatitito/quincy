@@ -1,6 +1,7 @@
 import type { Ticket } from "./tickets";
 
 export type TicketDirectory = string;
+export type ProjectPath = string;
 
 export type TicketRepository = () => Promise<Ticket[]>;
 
@@ -47,6 +48,7 @@ export interface AgentRepository {
 export type AgentSessionSummaryRepository = () => Promise<AgentSessionSummary[]>;
 
 export interface ProjectConfig {
+  projectPath: ProjectPath;
   ticketDirectory: TicketDirectory;
 }
 
