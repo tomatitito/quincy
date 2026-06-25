@@ -1,6 +1,6 @@
 ---
 id: qui-44k5
-status: open
+status: closed
 deps: [qui-ykd8, qui-pfup, qui-v9eq]
 links: []
 created: 2026-06-18T20:31:03Z

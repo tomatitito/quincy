@@ -6,7 +6,8 @@
   import TicketDetails from "$lib/components/TicketDetails.svelte";
   import type { GraphView as GraphViewData } from "$lib/application/getGraphView";
   import type { KanbanView } from "$lib/application/getKanbanView";
-  import { isWorkspacePane, type WorkspacePane, type WorkspaceTab } from "$lib/components/workspaceTabs";
+  import { nextLastWorkspaceTab, responsiveWorkspaceState, tabAfterTicketSelection } from "$lib/components/responsiveWorkspace";
+  import type { WorkspacePane, WorkspaceTab } from "$lib/components/workspaceTabs";
   import type { BrowserAppEventStream } from "$lib/infrastructure/inbound/browser/appEvents";
   import { viewportMode } from "$lib/infrastructure/inbound/browser/viewportMode";
 
@@ -30,16 +31,14 @@
   const openCount = $derived(tickets.filter((ticket) => ticket.status === "open").length);
   const closedCount = $derived(tickets.filter((ticket) => ticket.status === "closed").length);
   const readyCount = $derived(tickets.filter((ticket) => ticket.ready).length);
-  const isMobile = $derived($viewportMode === "mobile");
-  const agentOverlayOpen = $derived(isMobile && activeTab === "agent");
-  const visibleTab = $derived(agentOverlayOpen ? lastWorkspaceTab : activeTab);
-  const graphDirection = $derived(isMobile ? "tb" : "lr");
+  const workspaceState = $derived(responsiveWorkspaceState($viewportMode, activeTab, lastWorkspaceTab));
+  const agentOverlayOpen = $derived(workspaceState.agentOverlayOpen);
+  const visibleTab = $derived(workspaceState.visibleTab);
+  const graphDirection = $derived(workspaceState.graphDirection);
   const selectedTicket = $derived(tickets.find((ticket) => ticket.id === selectedTicketId));
 
   $effect(() => {
-    if (isWorkspacePane(activeTab)) {
-      lastWorkspaceTab = activeTab;
-    }
+    lastWorkspaceTab = nextLastWorkspaceTab(lastWorkspaceTab, activeTab);
   });
 
   function selectTab(tab: WorkspaceTab) {
@@ -52,8 +51,9 @@
 
   function selectTicket(ticketId: string) {
     onTicketSelect(ticketId);
-    if (isMobile) {
-      onTabChange("details");
+    const nextTab = tabAfterTicketSelection($viewportMode, activeTab);
+    if (nextTab !== activeTab) {
+      onTabChange(nextTab);
     }
   }
 </script>

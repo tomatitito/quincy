@@ -1,18 +1,7 @@
 import { browser } from "$app/environment";
 import { readable, type Subscriber, type Unsubscriber } from "svelte/store";
-
-export const viewportBreakpoints = {
-  mobileMax: 767,
-  tabletMax: 1199,
-} as const;
-
-export type ViewportMode = "mobile" | "tablet" | "desktop";
-
-export function viewportModeFromWidth(width: number): ViewportMode {
-  if (width <= viewportBreakpoints.mobileMax) return "mobile";
-  if (width <= viewportBreakpoints.tabletMax) return "tablet";
-  return "desktop";
-}
+import { viewportBreakpoints, type ViewportMode } from "$lib/infrastructure/inbound/browser/viewportModeCore";
+export { viewportBreakpoints, viewportModeFromWidth, type ViewportMode } from "$lib/infrastructure/inbound/browser/viewportModeCore";
 
 export const viewportMode = readable<ViewportMode>("desktop", (set) => {
   if (!browser) return;
