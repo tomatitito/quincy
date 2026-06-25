@@ -1,6 +1,6 @@
 ---
 id: qui-v9eq
-status: open
+status: closed
 deps: [qui-nq1j]
 links: []
 created: 2026-06-18T20:31:03Z
