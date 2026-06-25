@@ -8,11 +8,13 @@
   interface Props {
     tickets: TicketView[];
     graph: GraphDerivation;
+    initialDirection?: "lr" | "tb";
+    selectedTicketId?: string;
+    onTicketSelect?: (ticketId: string) => void;
   }
 
-  let { tickets, graph }: Props = $props();
+  let { tickets, graph, initialDirection = "lr", selectedTicketId, onTicketSelect }: Props = $props();
   let direction = $state<"lr" | "tb">("lr");
-  let selectedId = $state<string | undefined>();
 
   const cardWidth = 220;
   const cardHeight = 104;
@@ -45,6 +47,10 @@
   function isUnfilteredGraph() {
     return $epicFilterState.scope === "all" && $epicFilterState.statusVisibility === "all";
   }
+
+  $effect(() => {
+    direction = initialDirection;
+  });
 
   function dependencyPath(source: (typeof positionedNodes)[number], target: (typeof positionedNodes)[number]) {
     if (direction === "lr") {
@@ -151,11 +157,11 @@
             <button
               type="button"
               class:ready={ticket.ready}
-              class:selected={selectedId === ticket.id}
+              class:selected={selectedTicketId === ticket.id}
               class:filtered-epic-context={ticket.type === "epic" && selectedFilterEpicIds.has(ticket.id)}
               class="graph-ticket-card"
               style={`left: ${node.x}px; top: ${node.y}px; width: ${cardWidth}px; height: ${cardHeight}px;`}
-              onclick={() => (selectedId = ticket.id)}
+              onclick={() => onTicketSelect?.(ticket.id)}
             >
               <div class="graph-ticket-card-top">
                 <strong>{ticket.id}</strong>

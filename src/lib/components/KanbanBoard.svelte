@@ -6,9 +6,11 @@
 
   interface Props {
     columns: KanbanColumn[];
+    selectedTicketId?: string;
+    onTicketSelect?: (ticketId: string) => void;
   }
 
-  let { columns }: Props = $props();
+  let { columns, selectedTicketId, onTicketSelect }: Props = $props();
 
   const tickets = $derived(columns.flatMap((column) => column.tickets));
   const filteredColumns = $derived(filterKanbanColumnsByVisibility(columns, $epicFilterState));
@@ -74,27 +76,35 @@
       </select>
     </label>
   </aside>
-  {#each filteredColumns as column}
-    <article class="kanban-column">
-      <header>
-        <h2>{column.id.replace("_", " ")}</h2>
-        <span>{column.tickets.length}</span>
-      </header>
-      <div class="kanban-cards">
-        {#each column.tickets as ticket}
-          <div class:filtered-epic-context={ticket.type === "epic" && selectedFilterEpicIds.has(ticket.id)} class="kanban-card">
-            <div class="kanban-card-header">
-              <strong>{ticket.id}</strong>
-              <span class={`status-badge status-${ticket.status.replace("_", "-")}`}>P{ticket.priority}</span>
-            </div>
-            <p class="kanban-card-title">{ticket.title}</p>
-            <div class="kanban-card-meta">
-              <span>{ticket.type}</span>
-              <span>{ticket.status === "closed" ? "closed" : ticket.ready ? "ready" : "blocked"}</span>
-            </div>
-          </div>
-        {/each}
-      </div>
-    </article>
-  {/each}
+  <div aria-label="Kanban columns" class="kanban-columns" role="region">
+    {#each filteredColumns as column}
+      <article class="kanban-column">
+        <header>
+          <h2>{column.id.replace("_", " ")}</h2>
+          <span>{column.tickets.length}</span>
+        </header>
+        <div class="kanban-cards">
+          {#each column.tickets as ticket}
+            <button
+              type="button"
+              class:filtered-epic-context={ticket.type === "epic" && selectedFilterEpicIds.has(ticket.id)}
+              class:selected={selectedTicketId === ticket.id}
+              class="kanban-card"
+              onclick={() => onTicketSelect?.(ticket.id)}
+            >
+              <div class="kanban-card-header">
+                <strong>{ticket.id}</strong>
+                <span class={`status-badge status-${ticket.status.replace("_", "-")}`}>P{ticket.priority}</span>
+              </div>
+              <p class="kanban-card-title">{ticket.title}</p>
+              <div class="kanban-card-meta">
+                <span>{ticket.type}</span>
+                <span>{ticket.status === "closed" ? "closed" : ticket.ready ? "ready" : "blocked"}</span>
+              </div>
+            </button>
+          {/each}
+        </div>
+      </article>
+    {/each}
+  </div>
 </section>
