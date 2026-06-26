@@ -9,15 +9,20 @@ import { createPiRuntimeRepository } from "$lib/infrastructure/outbound/piRuntim
 import { createPiSessionSummaryRepository } from "$lib/infrastructure/outbound/piSessionSummaryRepository";
 import { publishAppEvent } from "$lib/infrastructure/outbound/appEventHub";
 import { createTicketFileRepository } from "$lib/infrastructure/outbound/ticketFileRepository";
+import type { AgentRepository, AgentSessionSummaryRepository, ProjectPath } from "$lib/domain/ports";
 
-const observedRepositoryPath = process.cwd();
-const agentRepository = createPiRuntimeRepository({ createSessionId: randomUUID, cwd: observedRepositoryPath, publishEvent: publishAppEvent });
-const agentSessionSummaryRepository = createPiSessionSummaryRepository({ cwd: observedRepositoryPath });
+interface ProjectRepositories {
+  agentRepository: AgentRepository;
+  agentSessionSummaryRepository: AgentSessionSummaryRepository;
+}
+
+const configProvider = createConfigProvider();
+const projectRepositories = new Map<ProjectPath, ProjectRepositories>();
 
 export async function handleApiRequest(request: Request): Promise<Response> {
   const path = new URL(request.url).pathname;
   if (request.method === "GET" && path.endsWith("/kanban")) return Response.json(await loadKanban());
-  if (request.method === "GET" && path.endsWith("/agent/sessions")) return Response.json(await getAgentSessionSummaries(agentSessionSummaryRepository));
+  if (request.method === "GET" && path.endsWith("/agent/sessions")) return Response.json(await loadAgentSessions());
   if (request.method === "POST" && path.endsWith("/agent/start")) return Response.json(await handleAgentStart(request));
   if (request.method === "POST" && path.endsWith("/agent/stop")) return Response.json(await handleAgentStop(request));
   if (request.method === "POST" && path.endsWith("/agent/input")) return Response.json(await handleAgentInput(request));
@@ -25,18 +30,25 @@ export async function handleApiRequest(request: Request): Promise<Response> {
 }
 
 async function loadKanban() {
-  const config = await createConfigProvider()();
+  const config = await configProvider();
   return getKanbanView(createTicketFileRepository(config.ticketDirectory));
+}
+
+async function loadAgentSessions() {
+  const { agentSessionSummaryRepository } = await loadProjectRepositories();
+  return getAgentSessionSummaries(agentSessionSummaryRepository);
 }
 
 async function handleAgentStart(request: Request) {
   const body = await readJsonRecord(request);
+  const { agentRepository } = await loadProjectRepositories();
   return startAgentSession(agentRepository, { prompt: optionalString(body.prompt) });
 }
 
 async function handleAgentStop(request: Request) {
   const body = await readJsonRecord(request);
   const sessionId = requiredString(body.sessionId, "sessionId");
+  const { agentRepository } = await loadProjectRepositories();
   return stopAgentSession(agentRepository, { sessionId });
 }
 
@@ -44,7 +56,28 @@ async function handleAgentInput(request: Request) {
   const body = await readJsonRecord(request);
   const sessionId = requiredString(body.sessionId, "sessionId");
   const input = requiredString(body.input, "input");
+  const { agentRepository } = await loadProjectRepositories();
   return sendAgentInput(agentRepository, { sessionId, input });
+}
+
+async function loadProjectRepositories(): Promise<ProjectRepositories> {
+  const config = await configProvider();
+  return repositoriesForProject(config.projectPath);
+}
+
+function repositoriesForProject(projectPath: ProjectPath): ProjectRepositories {
+  const existing = projectRepositories.get(projectPath);
+  if (existing !== undefined) return existing;
+  const repositories = createProjectRepositories(projectPath);
+  projectRepositories.set(projectPath, repositories);
+  return repositories;
+}
+
+function createProjectRepositories(projectPath: ProjectPath): ProjectRepositories {
+  return {
+    agentRepository: createPiRuntimeRepository({ createSessionId: randomUUID, cwd: projectPath, publishEvent: publishAppEvent }),
+    agentSessionSummaryRepository: createPiSessionSummaryRepository({ cwd: projectPath }),
+  };
 }
 
 async function readJsonRecord(request: Request): Promise<Record<string, unknown>> {

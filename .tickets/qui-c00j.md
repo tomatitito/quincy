@@ -1,6 +1,6 @@
 ---
 id: qui-c00j
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-06-26T21:13:04Z
