@@ -70,12 +70,11 @@ src/
       outbound/
         config.ts              # config provider implementation/loading
         tickets.ts             # filesystem ticket repository implementation
-        updates.ts             # update-check implementation
         ui.ts                  # optional Svelte-store bridge over ConfigProvider
         ...
 ```
 
-Use SvelteKit as the target framework. `routes` is the inbound adapter/UI edge, `components` contains reusable Svelte UI components, `application` contains use cases, `domain` contains pure logic and ports, and `infrastructure` contains adapter implementations including HTTP routing, config, filesystem access, update checks, external API calls, and UI-facing stores. `lib` is a SvelteKit convention/container, not an architectural layer by itself. The exact filenames can evolve during implementation, but new code should maintain these responsibilities.
+Use SvelteKit as the target framework. `routes` is the inbound adapter/UI edge, `components` contains reusable Svelte UI components, `application` contains use cases, `domain` contains pure logic and ports, and `infrastructure` contains adapter implementations including HTTP routing, config, filesystem access, external API calls, and UI-facing stores. `lib` is a SvelteKit convention/container, not an architectural layer by itself. The exact filenames can evolve during implementation, but new code should maintain these responsibilities.
 
 ## Scope
 
@@ -99,14 +98,14 @@ Use SvelteKit as the target framework. `routes` is the inbound adapter/UI edge, 
   - `routes` are SvelteKit entrypoints/controllers; they may call the infrastructure inbound HTTP router, application use cases, and `components`, but should stay thin.
   - `application` defines use cases only; use cases may call `domain` and depend on domain ports, but should not import concrete infrastructure.
   - `domain` owns types, pure logic, and ports; it must stay independent of HTTP, Svelte/React, filesystem, process state, configuration loading, and browser APIs.
-  - `infrastructure` owns concrete adapter implementations, including inbound HTTP routing, config loading/resolution, filesystem access, update checks, external API clients, Svelte-store bridges, and implementations of domain ports.
+  - `infrastructure` owns concrete adapter implementations, including inbound HTTP routing, config loading/resolution, filesystem access, external API clients, Svelte-store bridges, and implementations of domain ports.
 
 ### Phase 3: Reimplement core non-agent behavior
 
 - Route ticket API and page requests through SvelteKit route files.
 - Keep `routes/+page.svelte` as the SPA shell and consider `routes/api/[...path]/+server.ts` as a thin catch-all adapter into `lib/infrastructure/inbound/http/apiRouter.ts`.
 - Extract one application use case per action/view request, starting with the kanban view request.
-- Move ticket loading, project discovery, update checks, config access, external API calls, and other I/O behind domain ports implemented by infrastructure adapters.
+- Move ticket loading, project discovery, config access, external API calls, and other I/O behind domain ports implemented by infrastructure adapters.
 - Implement project/repository configuration so the ticket folder is configurable per repository/project.
 - Keep the current ticket format initially; configurable ticket formats are explicitly out of scope for this epic except for preserving reasonable seams.
 - Keep Svelte/page rendering concerns in `routes` and component files without mixing rendering into infrastructure outbound adapters or application use cases.
@@ -124,20 +123,24 @@ Use SvelteKit as the target framework. `routes` is the inbound adapter/UI edge, 
 
 - Architecture sensors are in place before the main `quincy` rebuild work begins.
 - The rebuilt app is named `quincy` and uses Svelte/SvelteKit, not React.
-- No active agent feature code exists in the rebuilt app runtime, UI, server routes, or public API surface.
+- Agent feature code exists only through the later closed `qui-ph1o` agent-panel epic and preserves the same Svelte/application/domain/infrastructure boundaries.
 - The app has explicit request entrypoints in SvelteKit `src/routes/` framework route files.
 - Each major non-agent use case is represented by a dedicated orchestrator under `src/lib/application/`.
 - Domain types, pure logic, and ports live under `src/lib/domain/` and do not import HTTP, Svelte/React, filesystem, process, config loading, or browser-specific modules.
 - External I/O and config implementations live under `src/lib/infrastructure/`, behind domain ports where appropriate.
 - Webpage/component rendering lives at the Svelte route/component edge rather than in a separate `views` module.
-- Core non-agent workflows work: load tickets, show kanban, show graph, show ticket details, filter/search, switch projects where applicable, and check updates where applicable.
+- Core non-agent workflows work: load tickets, show kanban, show graph, show ticket details, filter/search, and switch projects where applicable.
 - The ticket directory is configurable per repository/project.
 - The current ticket format remains supported; configurable ticket formats are not implemented yet and are tracked as future work when needed.
-- Tests and documentation are updated to reflect the new Svelte architecture and the absence of agent functionality.
+- Tests and documentation are updated to reflect the new Svelte architecture and the reintroduced bounded agent panel.
 - `bun run check` passes, or any remaining failures are tracked by follow-up tickets linked from this epic.
 
 ## Notes
 
 **2026-06-26T21:13:15Z**
 
-Reconciliation audit: this epic's original non-agent wording is obsolete because agent functionality was intentionally reintroduced under closed child epic qui-ph1o. Core Svelte/SvelteKit architecture, sensors, graph, kanban, details, responsive behavior, and agent boundaries are in place. Do not close awb-gjdz yet: remaining explicit rebuild criteria are tracked by qui-c00j for project-scoped ticket directory configuration and qui-bqze for deciding Quincy update-check scope.
+Reconciliation audit: this epic's original non-agent wording is obsolete because agent functionality was intentionally reintroduced under closed child epic qui-ph1o. Core Svelte/SvelteKit architecture, sensors, graph, kanban, details, responsive behavior, and agent boundaries are in place. Remaining explicit rebuild criteria were tracked by qui-c00j for project-scoped ticket directory configuration and qui-bqze for deciding Quincy update-check scope.
+
+**2026-06-26T21:35:00Z**
+
+Update-check scope decision: closed child ticket qui-bqze decides AWB-style update checking and self-update behavior are out of scope for this Quincy rebuild. Update checks should no longer be treated as an unmet rebuild criterion. Future update-check work, if needed, should be specified after Quincy has a release/distribution model.
