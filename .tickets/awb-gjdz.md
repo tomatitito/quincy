@@ -135,3 +135,9 @@ Use SvelteKit as the target framework. `routes` is the inbound adapter/UI edge, 
 - The current ticket format remains supported; configurable ticket formats are not implemented yet and are tracked as future work when needed.
 - Tests and documentation are updated to reflect the new Svelte architecture and the absence of agent functionality.
 - `bun run check` passes, or any remaining failures are tracked by follow-up tickets linked from this epic.
+
+## Notes
+
+**2026-06-26T21:13:15Z**
+
+Reconciliation audit: this epic's original non-agent wording is obsolete because agent functionality was intentionally reintroduced under closed child epic qui-ph1o. Core Svelte/SvelteKit architecture, sensors, graph, kanban, details, responsive behavior, and agent boundaries are in place. Do not close awb-gjdz yet: remaining explicit rebuild criteria are tracked by qui-c00j for project-scoped ticket directory configuration and qui-bqze for deciding Quincy update-check scope.

@@ -6,4 +6,4 @@
 - `lib/domain/`: domain types, pure rules, and ports.
 - `lib/infrastructure/`: inbound and outbound adapters.
 
-The old AWB project in `../awb` is reference material only; agent code is intentionally not copied into this rebuild.
+The old AWB project in `../awb` is reference material only. Agent functionality was reintroduced through Quincy-specific tickets and should keep using the local application/domain/infrastructure boundaries.
