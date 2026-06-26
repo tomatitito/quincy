@@ -1,6 +1,6 @@
 ---
 id: awb-gjdz
-status: in_progress
+status: closed
 deps: []
 links: [awb-hcap]
 created: 2026-05-23T00:00:00Z
