@@ -93,7 +93,7 @@
       {:else if visibleTab === "details"}
         <TicketDetails ticket={selectedTicket} />
       {:else}
-        <AgentPanel {appEvents} />
+        <AgentPanel {appEvents} projectPath={data.projectPath} />
       {/if}
     </main>
   {:else if $viewportMode === "tablet"}
@@ -105,7 +105,7 @@
       {:else if visibleTab === "details"}
         <TicketDetails ticket={selectedTicket} />
       {:else}
-        <AgentPanel {appEvents} />
+        <AgentPanel {appEvents} projectPath={data.projectPath} />
       {/if}
     </main>
   {:else}
@@ -126,7 +126,7 @@
           <h2>Agent</h2>
         </header>
         <div class="mobile-agent-overlay-body">
-          <AgentPanel {appEvents} />
+          <AgentPanel {appEvents} projectPath={data.projectPath} />
         </div>
       </section>
     {/if}

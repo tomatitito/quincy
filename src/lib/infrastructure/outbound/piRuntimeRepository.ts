@@ -38,7 +38,7 @@ async function startSession({ createSessionId, cwd, publishEvent }: PiRuntimeRep
   const sessionId = createSessionId();
   try {
     const { createAgentSession, SessionManager } = await loadPiSdk();
-    const { session } = await createAgentSession({ cwd, sessionManager: SessionManager.inMemory(cwd) });
+    const { session } = await createAgentSession({ cwd, sessionManager: SessionManager.create(cwd) });
     const unsubscribe = session.subscribe((event) => publishPiSessionEvent(publishEvent, sessionId, event));
     registerSession(sessionId, { session, unsubscribe });
     publishRuntimeEvents(publishEvent, sessionId, [{ type: "agent_start", message: "Agent session is running." }]);
@@ -68,7 +68,7 @@ async function sendInput(publishEvent: AppEventPublisher, sessions: Map<AgentSes
 
 async function loadPiSdk() {
   const packageName = "@earendil-works/pi-coding-" + "agent";
-  return import(packageName) as Promise<{ createAgentSession: (options: unknown) => Promise<{ session: PiAgentSession }>; SessionManager: { inMemory: (cwd?: string) => unknown } }>;
+  return import(packageName) as Promise<{ createAgentSession: (options: unknown) => Promise<{ session: PiAgentSession }>; SessionManager: { create: (cwd?: string) => unknown } }>;
 }
 
 function runPrompt(publishEvent: AppEventPublisher, sessionId: AgentSessionId, session: PiAgentSession, input: AgentInputText) {

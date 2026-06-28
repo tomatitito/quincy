@@ -3,7 +3,7 @@
 
   type AgentStatus = "empty" | "running" | "completed" | "failed" | "cancelled";
 
-  let { appEvents }: { appEvents?: BrowserAppEventStream } = $props();
+  let { appEvents, projectPath }: { appEvents?: BrowserAppEventStream; projectPath: string } = $props();
 
   let status = $state<AgentStatus>("empty");
   let message = $state("No agent session has reported activity yet.");
@@ -15,12 +15,16 @@
   let sessionListMessage = $state("Loading repository sessions…");
   let sessionSummaries = $state<AgentSessionSummary[]>([]);
   let output = $state<AgentOutput[]>([]);
+  let lastSessionProjectPath = $state<string>();
 
   const statusLabel = $derived(status === "empty" ? "Not connected" : status);
-  const canSubmitInput = $derived(inputText.length > 0 && !commandBusy);
+  const canSubmitInput = $derived(inputText.trim().length > 0 && !commandBusy);
 
   $effect(() => {
-    void loadSessionSummaries();
+    if (lastSessionProjectPath === projectPath) return;
+    lastSessionProjectPath = projectPath;
+    resetSessionState();
+    void loadSessionSummaries(projectPath);
   });
 
   $effect(() => {
@@ -42,6 +46,7 @@
 
     status = nextStatus;
     message = stringFrom(payload?.message) ?? defaultMessage(nextStatus);
+    if (nextStatus === "completed" || nextStatus === "failed" || nextStatus === "cancelled") void loadSessionSummaries();
   }
 
   function handleOutputEvent(event: BrowserAppEvent) {
@@ -64,10 +69,11 @@
     return true;
   }
 
-  async function loadSessionSummaries() {
+  async function loadSessionSummaries(requestProjectPath = projectPath) {
     sessionListBusy = true;
     try {
       const response = await fetch("/api/agent/sessions");
+      if (requestProjectPath !== projectPath) return;
       if (!response.ok) {
         sessionListMessage = "Agent sessions could not be loaded.";
         return;
@@ -75,10 +81,21 @@
       sessionSummaries = parseSessionSummaries(await response.json());
       sessionListMessage = sessionSummaries.length === 0 ? "No repository sessions found." : "";
     } catch {
-      sessionListMessage = "Agent sessions could not be loaded.";
+      if (requestProjectPath === projectPath) sessionListMessage = "Agent sessions could not be loaded.";
     } finally {
-      sessionListBusy = false;
+      if (requestProjectPath === projectPath) sessionListBusy = false;
     }
+  }
+
+  function resetSessionState() {
+    status = "empty";
+    message = "No agent session has reported activity yet.";
+    commandMessage = "No agent command has been sent yet.";
+    inputText = "";
+    activeSessionId = undefined;
+    sessionSummaries = [];
+    output = [];
+    sessionListMessage = "Loading repository sessions…";
   }
 
   async function startSession() {
@@ -91,15 +108,21 @@
   }
 
   async function sendInput() {
-    if (inputText.length === 0) return;
+    const input = inputText.trim();
+    if (input.length === 0) return;
     const sessionId = activeSessionId ?? (await startSession())?.sessionId;
     if (sessionId === undefined) return;
-    const input = inputText;
     output = [...output, { key: `user-${crypto.randomUUID()}`, role: "user", text: input }];
     const result = await sendCommand("/api/agent/input", { sessionId, input });
     if (result === undefined) return;
     inputText = "";
     commandMessage = result.message;
+  }
+
+  function handleInputKeydown(event: KeyboardEvent) {
+    if (event.key !== "Enter" || event.shiftKey) return;
+    event.preventDefault();
+    void sendInput();
   }
 
   async function stopActiveSession() {
@@ -227,7 +250,7 @@
   <aside class="agent-session-sidebar" aria-label="Repository agent sessions">
     <div class="sidebar-header">
       <p class="eyebrow">Sessions</p>
-      <button type="button" onclick={loadSessionSummaries} disabled={sessionListBusy}>Refresh</button>
+      <button type="button" onclick={() => loadSessionSummaries()} disabled={sessionListBusy}>Refresh</button>
     </div>
 
     {#if sessionSummaries.length > 0}
@@ -281,7 +304,7 @@
       <div class="agent-chat-input">
         <label>
           <span class="visually-hidden">Input</span>
-          <textarea bind:value={inputText} disabled={commandBusy} placeholder="Send input to the active agent session"></textarea>
+          <textarea bind:value={inputText} disabled={commandBusy} placeholder="Send input to the active agent session" onkeydown={handleInputKeydown}></textarea>
         </label>
         <button type="button" onclick={sendInput} disabled={!canSubmitInput} aria-label="Send input">↑</button>
       </div>
