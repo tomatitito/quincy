@@ -9,6 +9,7 @@ import { createPiRuntimeRepository } from "$lib/infrastructure/outbound/piRuntim
 import { createPiSessionSummaryRepository } from "$lib/infrastructure/outbound/piSessionSummaryRepository";
 import { publishAppEvent } from "$lib/infrastructure/outbound/appEventHub";
 import { createTicketFileRepository } from "$lib/infrastructure/outbound/ticketFileRepository";
+import { createSelectedProjectCookie, readSelectedProjectFromRequest } from "$lib/infrastructure/inbound/http/projectSelectionCookie";
 import type { AgentRepository, AgentSessionSummaryRepository, ProjectPath } from "$lib/domain/ports";
 
 interface ProjectRepositories {
@@ -21,34 +22,45 @@ const projectRepositories = new Map<ProjectPath, ProjectRepositories>();
 
 export async function handleApiRequest(request: Request): Promise<Response> {
   const path = new URL(request.url).pathname;
-  if (request.method === "GET" && path.endsWith("/kanban")) return Response.json(await loadKanban());
-  if (request.method === "GET" && path.endsWith("/agent/sessions")) return Response.json(await loadAgentSessions());
+  if (request.method === "GET" && path.endsWith("/kanban")) return Response.json(await loadKanban(request));
+  if (request.method === "GET" && path.endsWith("/agent/sessions")) return Response.json(await loadAgentSessions(request));
+  if (request.method === "POST" && path.endsWith("/projects/select")) return handleProjectSelect(request);
   if (request.method === "POST" && path.endsWith("/agent/start")) return Response.json(await handleAgentStart(request));
   if (request.method === "POST" && path.endsWith("/agent/stop")) return Response.json(await handleAgentStop(request));
   if (request.method === "POST" && path.endsWith("/agent/input")) return Response.json(await handleAgentInput(request));
   return Response.json({ error: "Not found" }, { status: 404 });
 }
 
-async function loadKanban() {
-  const config = await configProvider();
+async function loadKanban(request: Request) {
+  const config = await loadConfig(request);
   return getKanbanView(createTicketFileRepository(config.ticketDirectory));
 }
 
-async function loadAgentSessions() {
-  const { agentSessionSummaryRepository } = await loadProjectRepositories();
+async function loadAgentSessions(request: Request) {
+  const { agentSessionSummaryRepository } = await loadProjectRepositories(request);
   return getAgentSessionSummaries(agentSessionSummaryRepository);
+}
+
+async function handleProjectSelect(request: Request) {
+  const body = await readJsonRecord(request);
+  const projectPath = requiredString(body.projectPath, "projectPath");
+  const config = await configProvider({ selectedProjectPath: projectPath });
+  return Response.json(
+    { projectPath: config.projectPath, ticketDirectory: config.ticketDirectory },
+    { headers: { "set-cookie": createSelectedProjectCookie(config.projectPath) } },
+  );
 }
 
 async function handleAgentStart(request: Request) {
   const body = await readJsonRecord(request);
-  const { agentRepository } = await loadProjectRepositories();
+  const { agentRepository } = await loadProjectRepositories(request);
   return startAgentSession(agentRepository, { prompt: optionalString(body.prompt) });
 }
 
 async function handleAgentStop(request: Request) {
   const body = await readJsonRecord(request);
   const sessionId = requiredString(body.sessionId, "sessionId");
-  const { agentRepository } = await loadProjectRepositories();
+  const { agentRepository } = await loadProjectRepositories(request);
   return stopAgentSession(agentRepository, { sessionId });
 }
 
@@ -56,13 +68,17 @@ async function handleAgentInput(request: Request) {
   const body = await readJsonRecord(request);
   const sessionId = requiredString(body.sessionId, "sessionId");
   const input = requiredString(body.input, "input");
-  const { agentRepository } = await loadProjectRepositories();
+  const { agentRepository } = await loadProjectRepositories(request);
   return sendAgentInput(agentRepository, { sessionId, input });
 }
 
-async function loadProjectRepositories(): Promise<ProjectRepositories> {
-  const config = await configProvider();
+async function loadProjectRepositories(request: Request): Promise<ProjectRepositories> {
+  const config = await loadConfig(request);
   return repositoriesForProject(config.projectPath);
+}
+
+async function loadConfig(request: Request) {
+  return configProvider({ selectedProjectPath: readSelectedProjectFromRequest(request) });
 }
 
 function repositoriesForProject(projectPath: ProjectPath): ProjectRepositories {

@@ -121,16 +121,29 @@ select:focus-visible {
 }
 
 .project-selector-path,
-.project-selector-status {
+.project-selector-status,
+.project-selector-dropdown {
   font-size: 10px;
+}
+
+.project-selector-path,
+.project-selector-dropdown {
+  max-width: min(70vw, 520px);
 }
 
 .project-selector-path {
   color: var(--dim);
-  max-width: min(70vw, 520px);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.project-selector-dropdown {
+  background: var(--body-bg);
+  border: 1px solid var(--dim);
+  border-radius: 3px;
+  color: var(--text);
+  padding: 2px 4px;
 }
 
 .project-selector-status {

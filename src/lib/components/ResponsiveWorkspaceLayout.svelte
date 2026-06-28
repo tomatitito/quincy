@@ -8,12 +8,15 @@
   import type { KanbanView } from "$lib/application/getKanbanView";
   import { nextLastWorkspaceTab, responsiveWorkspaceState, tabAfterTicketSelection } from "$lib/components/responsiveWorkspace";
   import type { WorkspacePane, WorkspaceTab } from "$lib/components/workspaceTabs";
+  import type { SelectableProject } from "$lib/domain/ports";
   import type { BrowserAppEventStream } from "$lib/infrastructure/inbound/browser/appEvents";
   import { viewportMode } from "$lib/infrastructure/inbound/browser/viewportMode";
 
   interface Props {
     data: {
       projectPath: string;
+      ticketDirectory: string;
+      selectableProjects: SelectableProject[];
       graph: GraphViewData;
       kanban: KanbanView;
     };
@@ -21,11 +24,12 @@
     selectedTicketId?: string;
     appEvents?: BrowserAppEventStream;
     onRefresh: () => void;
+    onProjectSelect: (projectPath: string) => void;
     onTabChange: (tab: WorkspaceTab) => void;
     onTicketSelect: (ticketId: string) => void;
   }
 
-  let { data, activeTab, selectedTicketId, appEvents, onRefresh, onTabChange, onTicketSelect }: Props = $props();
+  let { data, activeTab, selectedTicketId, appEvents, onRefresh, onProjectSelect, onTabChange, onTicketSelect }: Props = $props();
   let lastWorkspaceTab = $state<WorkspacePane>("graph");
 
   const tickets = $derived(data.graph.tickets);
@@ -60,7 +64,7 @@
 </script>
 
 <div class="app-shell" data-viewport-mode={$viewportMode}>
-  <AppHeader projectPath={data.projectPath} {onRefresh} />
+  <AppHeader projectPath={data.projectPath} selectableProjects={data.selectableProjects} {onRefresh} {onProjectSelect} />
 
   <section class="tabs" aria-label="Workspace summary">
     <nav class="tabs-nav" aria-label="Views">

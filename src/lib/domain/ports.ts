@@ -2,6 +2,8 @@ import type { Ticket } from "./tickets";
 
 export type TicketDirectory = string;
 export type ProjectPath = string;
+export type ProjectLabel = string;
+export type ConfigWarning = string;
 
 export type TicketRepository = () => Promise<Ticket[]>;
 
@@ -47,9 +49,21 @@ export interface AgentRepository {
 
 export type AgentSessionSummaryRepository = () => Promise<AgentSessionSummary[]>;
 
+export interface SelectableProject {
+  root: ProjectPath;
+  label?: ProjectLabel;
+  ticketDirectory?: TicketDirectory;
+}
+
 export interface ProjectConfig {
   projectPath: ProjectPath;
   ticketDirectory: TicketDirectory;
+  selectableProjects: SelectableProject[];
+  configWarnings: ConfigWarning[];
 }
 
-export type ConfigProvider = () => Promise<ProjectConfig>;
+export interface ConfigRequest {
+  selectedProjectPath?: ProjectPath;
+}
+
+export type ConfigProvider = (request?: ConfigRequest) => Promise<ProjectConfig>;
