@@ -678,7 +678,7 @@ select:focus-visible {
   line-height: 1.35;
   overflow: hidden;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
 }
 
 .graph-ticket-card-meta {

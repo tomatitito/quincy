@@ -17,7 +17,7 @@
   let direction = $state<"lr" | "tb">("lr");
 
   const cardWidth = 220;
-  const cardHeight = 104;
+  const cardHeight = 128;
   const padding = 48;
   const layerGap = 112;
   const orderGap = 28;
