@@ -9,6 +9,10 @@
   let message = $state("No agent session has reported activity yet.");
   let commandMessage = $state("No agent command has been sent yet.");
   let inputText = $state("");
+  let inputElement = $state<HTMLTextAreaElement>();
+  let fileSuggestions = $state<ProjectFileSuggestion[]>([]);
+  let fileSuggestionIndex = $state(0);
+  let fileMention = $state<FileMention>();
   let activeSessionId = $state<string>();
   let commandBusy = $state(false);
   let sessionListBusy = $state(false);
@@ -116,10 +120,25 @@
     const result = await sendCommand("/api/agent/input", { sessionId, input });
     if (result === undefined) return;
     inputText = "";
+    closeFileSuggestions();
     commandMessage = result.message;
   }
 
+  function handleInput(event: Event) {
+    const target = event.currentTarget;
+    if (!(target instanceof HTMLTextAreaElement)) return;
+    inputText = target.value;
+    void updateFileSuggestions(target.selectionStart);
+  }
+
+  function handleInputClick(event: MouseEvent) {
+    const target = event.currentTarget;
+    if (!(target instanceof HTMLTextAreaElement)) return;
+    void updateFileSuggestions(target.selectionStart);
+  }
+
   function handleInputKeydown(event: KeyboardEvent) {
+    if (handleFileSuggestionKeydown(event)) return;
     if (event.key !== "Enter" || event.shiftKey) return;
     event.preventDefault();
     void sendInput();
@@ -168,6 +187,16 @@
     lastUsedAt: string;
   }
 
+  interface ProjectFileSuggestion {
+    path: string;
+  }
+
+  interface FileMention {
+    start: number;
+    end: number;
+    query: string;
+  }
+
   type AgentOutputRole = "user" | "assistant";
 
   interface AgentOutput {
@@ -194,6 +223,92 @@
     const message = stringFrom(result.message);
     if (sessionId === undefined || message === undefined) return undefined;
     return { accepted: true, sessionId, message };
+  }
+
+  async function updateFileSuggestions(caretPosition = inputText.length) {
+    const mention = findFileMention(inputText, caretPosition);
+    fileMention = mention;
+    fileSuggestionIndex = 0;
+    if (mention === undefined) {
+      closeFileSuggestions();
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/project-files?query=${encodeURIComponent(mention.query)}`);
+      if (!response.ok) {
+        closeFileSuggestions();
+        return;
+      }
+      if (fileMention?.start !== mention.start || fileMention.end !== mention.end || fileMention.query !== mention.query) return;
+      fileSuggestions = parseProjectFileSuggestions(await response.json());
+    } catch {
+      closeFileSuggestions();
+    }
+  }
+
+  function findFileMention(text: string, caretPosition: number): FileMention | undefined {
+    const beforeCaret = text.slice(0, caretPosition);
+    const start = beforeCaret.lastIndexOf("@");
+    if (start === -1) return undefined;
+    const query = beforeCaret.slice(start + 1);
+    if (/\s/.test(query)) return undefined;
+    if (start > 0 && /\S/.test(beforeCaret[start - 1])) return undefined;
+    return { start, end: caretPosition, query };
+  }
+
+  function handleFileSuggestionKeydown(event: KeyboardEvent): boolean {
+    if (fileMention === undefined || fileSuggestions.length === 0) return false;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      fileSuggestionIndex = (fileSuggestionIndex + 1) % fileSuggestions.length;
+      return true;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      fileSuggestionIndex = (fileSuggestionIndex - 1 + fileSuggestions.length) % fileSuggestions.length;
+      return true;
+    }
+    if (event.key === "Enter" || event.key === "Tab") {
+      event.preventDefault();
+      insertFileSuggestion(fileSuggestions[fileSuggestionIndex]);
+      return true;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeFileSuggestions();
+      return true;
+    }
+    return false;
+  }
+
+  function insertFileSuggestion(suggestion: ProjectFileSuggestion) {
+    if (fileMention === undefined) return;
+    const replacement = `@${suggestion.path}`;
+    inputText = inputText.slice(0, fileMention.start) + replacement + inputText.slice(fileMention.end);
+    const caretPosition = fileMention.start + replacement.length;
+    closeFileSuggestions();
+    queueMicrotask(() => {
+      inputElement?.focus();
+      inputElement?.setSelectionRange(caretPosition, caretPosition);
+    });
+  }
+
+  function closeFileSuggestions() {
+    fileMention = undefined;
+    fileSuggestions = [];
+    fileSuggestionIndex = 0;
+  }
+
+  function parseProjectFileSuggestions(value: unknown): ProjectFileSuggestion[] {
+    if (!Array.isArray(value)) return [];
+    return value.map(parseProjectFileSuggestion).filter((suggestion): suggestion is ProjectFileSuggestion => suggestion !== undefined);
+  }
+
+  function parseProjectFileSuggestion(value: unknown): ProjectFileSuggestion | undefined {
+    const suggestion = asRecord(value);
+    const path = stringFrom(suggestion?.path);
+    return path === undefined ? undefined : { path };
   }
 
   function parseSessionSummaries(value: unknown): AgentSessionSummary[] {
@@ -304,9 +419,18 @@
       <div class="agent-chat-input">
         <label>
           <span class="visually-hidden">Input</span>
-          <textarea bind:value={inputText} disabled={commandBusy} placeholder="Send input to the active agent session" onkeydown={handleInputKeydown}></textarea>
+          <textarea bind:this={inputElement} bind:value={inputText} disabled={commandBusy} placeholder="Send input to the active agent session" oninput={handleInput} onclick={handleInputClick} onkeydown={handleInputKeydown}></textarea>
         </label>
         <button type="button" onclick={sendInput} disabled={!canSubmitInput} aria-label="Send input">↑</button>
+        {#if fileMention !== undefined && fileSuggestions.length > 0}
+          <div class="file-suggestions" role="listbox" aria-label="Project files">
+            {#each fileSuggestions as suggestion, index (suggestion.path)}
+              <button type="button" role="option" aria-selected={index === fileSuggestionIndex} class:active={index === fileSuggestionIndex} onmousedown={(event) => event.preventDefault()} onclick={() => insertFileSuggestion(suggestion)}>
+                {suggestion.path}
+              </button>
+            {/each}
+          </div>
+        {/if}
       </div>
     </section>
   </div>
@@ -468,6 +592,7 @@
     grid-template-columns: minmax(0, 1fr) auto;
     min-height: 96px;
     padding: 12px;
+    position: relative;
   }
 
   .agent-chat-input:focus-within {
@@ -488,6 +613,44 @@
     line-height: 1;
     padding: 0;
     width: 38px;
+  }
+
+  .file-suggestions {
+    background: rgb(36, 43, 49);
+    border: 1px solid var(--dim);
+    border-radius: 10px;
+    bottom: calc(100% + 8px);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+    display: grid;
+    left: 12px;
+    max-height: 220px;
+    overflow-y: auto;
+    padding: 6px;
+    position: absolute;
+    right: 12px;
+    z-index: 5;
+  }
+
+  .file-suggestions button {
+    align-self: auto;
+    border: 0;
+    border-radius: 6px;
+    font-size: 12px;
+    height: auto;
+    justify-self: stretch;
+    line-height: 1.4;
+    overflow: hidden;
+    padding: 6px 8px;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: auto;
+  }
+
+  .file-suggestions button.active,
+  .file-suggestions button:hover {
+    background: var(--accent);
+    color: var(--body-bg);
   }
 
   button,

@@ -4,17 +4,20 @@ import { sendAgentInput } from "$lib/application/sendAgentInput";
 import { startAgentSession } from "$lib/application/startAgentSession";
 import { stopAgentSession } from "$lib/application/stopAgentSession";
 import { getKanbanView } from "$lib/application/getKanbanView";
+import { getProjectFileSuggestions } from "$lib/application/getProjectFileSuggestions";
 import { createConfigProvider } from "$lib/infrastructure/outbound/config";
 import { createPiRuntimeRepository } from "$lib/infrastructure/outbound/piRuntimeRepository";
 import { createPiSessionSummaryRepository } from "$lib/infrastructure/outbound/piSessionSummaryRepository";
+import { createProjectFileRepository } from "$lib/infrastructure/outbound/projectFileRepository";
 import { publishAppEvent } from "$lib/infrastructure/outbound/appEventHub";
 import { createTicketFileRepository } from "$lib/infrastructure/outbound/ticketFileRepository";
 import { createSelectedProjectCookie, readSelectedProjectFromRequest } from "$lib/infrastructure/inbound/http/projectSelectionCookie";
-import type { AgentRepository, AgentSessionSummaryRepository, ProjectPath } from "$lib/domain/ports";
+import type { AgentRepository, AgentSessionSummaryRepository, ProjectFileRepository, ProjectPath } from "$lib/domain/ports";
 
 interface ProjectRepositories {
   agentRepository: AgentRepository;
   agentSessionSummaryRepository: AgentSessionSummaryRepository;
+  projectFileRepository: ProjectFileRepository;
 }
 
 const configProvider = createConfigProvider();
@@ -22,12 +25,27 @@ const projectRepositories = new Map<ProjectPath, ProjectRepositories>();
 
 export async function handleApiRequest(request: Request): Promise<Response> {
   const path = new URL(request.url).pathname;
-  if (request.method === "GET" && path.endsWith("/kanban")) return Response.json(await loadKanban(request));
-  if (request.method === "GET" && path.endsWith("/agent/sessions")) return Response.json(await loadAgentSessions(request));
-  if (request.method === "POST" && path.endsWith("/projects/select")) return handleProjectSelect(request);
-  if (request.method === "POST" && path.endsWith("/agent/start")) return Response.json(await handleAgentStart(request));
-  if (request.method === "POST" && path.endsWith("/agent/stop")) return Response.json(await handleAgentStop(request));
-  if (request.method === "POST" && path.endsWith("/agent/input")) return Response.json(await handleAgentInput(request));
+  if (request.method === "GET") return handleGetRequest(request, path);
+  if (request.method === "POST") return handlePostRequest(request, path);
+  return notFoundResponse();
+}
+
+async function handleGetRequest(request: Request, path: string): Promise<Response> {
+  if (path.endsWith("/kanban")) return Response.json(await loadKanban(request));
+  if (path.endsWith("/agent/sessions")) return Response.json(await loadAgentSessions(request));
+  if (path.endsWith("/project-files")) return Response.json(await loadProjectFileSuggestions(request));
+  return notFoundResponse();
+}
+
+async function handlePostRequest(request: Request, path: string): Promise<Response> {
+  if (path.endsWith("/projects/select")) return handleProjectSelect(request);
+  if (path.endsWith("/agent/start")) return Response.json(await handleAgentStart(request));
+  if (path.endsWith("/agent/stop")) return Response.json(await handleAgentStop(request));
+  if (path.endsWith("/agent/input")) return Response.json(await handleAgentInput(request));
+  return notFoundResponse();
+}
+
+function notFoundResponse(): Response {
   return Response.json({ error: "Not found" }, { status: 404 });
 }
 
@@ -39,6 +57,11 @@ async function loadKanban(request: Request) {
 async function loadAgentSessions(request: Request) {
   const { agentSessionSummaryRepository } = await loadProjectRepositories(request);
   return getAgentSessionSummaries(agentSessionSummaryRepository);
+}
+
+async function loadProjectFileSuggestions(request: Request) {
+  const { projectFileRepository } = await loadProjectRepositories(request);
+  return getProjectFileSuggestions(projectFileRepository, { query: new URL(request.url).searchParams.get("query") ?? "" });
 }
 
 async function handleProjectSelect(request: Request) {
@@ -93,6 +116,7 @@ function createProjectRepositories(projectPath: ProjectPath): ProjectRepositorie
   return {
     agentRepository: createPiRuntimeRepository({ createSessionId: randomUUID, cwd: projectPath, publishEvent: publishAppEvent }),
     agentSessionSummaryRepository: createPiSessionSummaryRepository({ cwd: projectPath }),
+    projectFileRepository: createProjectFileRepository(projectPath),
   };
 }
 

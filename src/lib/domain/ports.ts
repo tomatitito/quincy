@@ -3,6 +3,9 @@ import type { Ticket } from "./tickets";
 export type TicketDirectory = string;
 export type ProjectPath = string;
 export type ProjectLabel = string;
+export type ProjectFilePath = string;
+export type ProjectFileSuggestionQueryText = string;
+export type ProjectFileSuggestionLimit = number;
 export type ConfigWarning = string;
 
 export type TicketRepository = () => Promise<Ticket[]>;
@@ -48,6 +51,17 @@ export interface AgentRepository {
 }
 
 export type AgentSessionSummaryRepository = () => Promise<AgentSessionSummary[]>;
+
+export interface ProjectFileSuggestion {
+  path: ProjectFilePath;
+}
+
+export interface ProjectFileSuggestionQuery {
+  query: ProjectFileSuggestionQueryText;
+  limit: ProjectFileSuggestionLimit;
+}
+
+export type ProjectFileRepository = (query: ProjectFileSuggestionQuery) => Promise<ProjectFileSuggestion[]>;
 
 export interface SelectableProject {
   root: ProjectPath;
