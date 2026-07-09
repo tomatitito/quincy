@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { micromark } from "micromark";
   import type { TicketView } from "$lib/domain/tickets";
 
   interface Props {
@@ -6,6 +7,16 @@
   }
 
   let { ticket }: Props = $props();
+  let htmlEnabled = $state(false);
+  let previousTicketId = $state<string | undefined>();
+
+  $effect(() => {
+    if (ticket?.id === previousTicketId) return;
+    previousTicketId = ticket?.id;
+    htmlEnabled = false;
+  });
+
+  let renderedDescription = $derived(ticket?.description ? micromark(ticket.description, { allowDangerousHtml: htmlEnabled }) : "");
 </script>
 
 {#if ticket}
@@ -38,9 +49,16 @@
     </dl>
 
     <section>
-      <h3>Description</h3>
+      <div class="description-heading">
+        <h3>Description</h3>
+        {#if ticket.description}
+          <button type="button" class="html-toggle" aria-pressed={htmlEnabled} onclick={() => (htmlEnabled = !htmlEnabled)}>
+            {htmlEnabled ? "Disable HTML" : "Enable HTML"}
+          </button>
+        {/if}
+      </div>
       {#if ticket.description}
-        <div class="ticket-description">{ticket.description}</div>
+        <div class="ticket-description">{@html renderedDescription}</div>
       {:else}
         <p>No description.</p>
       {/if}
@@ -49,7 +67,7 @@
     <section>
       <h3>Dependencies</h3>
       {#if ticket.deps.length > 0}
-        <ul>
+        <ul class="dependency-list">
           {#each ticket.deps as dependency}
             <li>{dependency}</li>
           {/each}
@@ -117,7 +135,29 @@
   }
 
   .ticket-details h3 {
+    margin: 0;
+  }
+
+  .description-heading {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
     margin: 0 0 8px;
+  }
+
+  .html-toggle {
+    background: var(--body-bg);
+    border: 1px solid var(--dim);
+    border-radius: 3px;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 10px;
+    padding: 3px 6px;
+  }
+
+  .html-toggle[aria-pressed="true"] {
+    color: var(--text);
   }
 
   .ticket-details section + section {
@@ -127,10 +167,17 @@
   .ticket-description {
     color: var(--text);
     line-height: 1.5;
-    white-space: pre-wrap;
   }
 
-  .ticket-details ul {
+  .ticket-description :global(:first-child) {
+    margin-top: 0;
+  }
+
+  .ticket-description :global(:last-child) {
+    margin-bottom: 0;
+  }
+
+  .dependency-list {
     display: grid;
     gap: 6px;
     list-style: none;
@@ -138,7 +185,7 @@
     padding: 0;
   }
 
-  .ticket-details li {
+  .dependency-list li {
     background: var(--body-bg);
     border: 1px solid var(--dim);
     border-radius: 3px;

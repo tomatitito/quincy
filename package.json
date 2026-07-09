@@ -25,6 +25,7 @@
     "vite": "^8.0.14"
   },
   "dependencies": {
-    "@earendil-works/pi-coding-agent": "^0.79.2"
+    "@earendil-works/pi-coding-agent": "^0.79.2",
+    "micromark": "^4.0.2"
   }
 }

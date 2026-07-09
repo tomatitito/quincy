@@ -1,6 +1,6 @@
 ---
 id: qui-mdmk
-status: open
+status: closed
 deps: []
 links: []
 created: 2026-07-09T12:46:12Z
