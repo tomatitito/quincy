@@ -68,9 +68,13 @@
     background: var(--container-bg);
     border: 1px solid var(--dim);
     border-radius: 4px;
+    height: calc(100% - 32px);
     margin: 16px 18px;
     max-width: 720px;
+    min-height: 0;
+    overflow-y: auto;
     padding: 14px;
+    scrollbar-width: thin;
   }
 
   .ticket-details header {
