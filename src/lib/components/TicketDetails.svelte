@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { micromark } from "micromark";
+  import hljs from "highlight.js";
+  import "highlight.js/styles/github-dark.css";
+  import { marked, type Tokens } from "marked";
   import type { TicketView } from "$lib/domain/tickets";
 
   interface Props {
@@ -16,7 +18,29 @@
     htmlEnabled = false;
   });
 
-  let renderedDescription = $derived(ticket?.description ? micromark(ticket.description, { allowDangerousHtml: htmlEnabled }) : "");
+  let renderedDescription = $derived(ticket?.description ? renderMarkdown(ticket.description, htmlEnabled) : "");
+
+  function renderMarkdown(markdown: string, allowHtml: boolean): string {
+    const renderer = new marked.Renderer();
+    renderer.code = renderCode;
+    renderer.html = ({ text }) => (allowHtml ? text : escapeHtml(text));
+    return marked.parse(markdown, { async: false, gfm: true, renderer });
+  }
+
+  function renderCode({ text, lang }: Tokens.Code): string {
+    const language = lang?.match(/\S+/)?.[0];
+    if (language !== undefined && hljs.getLanguage(language) !== undefined) {
+      const highlighted = hljs.highlight(text, { language }).value;
+      return `<pre><code class="hljs language-${escapeHtml(language)}">${highlighted}</code></pre>`;
+    }
+
+    const className = language === undefined ? "hljs" : `hljs language-${escapeHtml(language)}`;
+    return `<pre><code class="${className}">${escapeHtml(text)}</code></pre>`;
+  }
+
+  function escapeHtml(value: string): string {
+    return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+  }
 </script>
 
 {#if ticket}
@@ -175,6 +199,29 @@
 
   .ticket-description :global(:last-child) {
     margin-bottom: 0;
+  }
+
+  .ticket-description :global(pre) {
+    border-radius: 3px;
+    margin: 8px 0;
+    overflow-x: auto;
+  }
+
+  .ticket-description :global(code) {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  }
+
+  .ticket-description :global(:not(pre) > code) {
+    background: var(--body-bg);
+    border: 1px solid var(--dim);
+    border-radius: 3px;
+    padding: 1px 4px;
+  }
+
+  .ticket-description :global(pre code) {
+    display: block;
+    overflow-x: auto;
+    white-space: pre;
   }
 
   .dependency-list {

@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "^0.79.2",
-    "micromark": "^4.0.2"
+    "highlight.js": "^11.11.1",
+    "marked": "^18.0.5"
   }
 }

@@ -1,6 +1,6 @@
 ---
 id: qui-synh
-status: open
+status: closed
 deps: [qui-mdmk]
 links: []
 created: 2026-07-09T12:46:12Z
