@@ -28,7 +28,7 @@ describe("graph ticket filters", () => {
 });
 
 function ticket(id: string, type: string, status: TicketView["status"], parent?: string): TicketView {
-  return { id, title: id, status, priority: 1, type, deps: [], parent, ready: status !== "closed" };
+  return { id, title: id, description: "", status, priority: 1, type, deps: [], parent, ready: status !== "closed" };
 }
 
 function ids(filteredTickets: TicketView[]): string[] {

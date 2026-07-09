@@ -38,6 +38,15 @@
     </dl>
 
     <section>
+      <h3>Description</h3>
+      {#if ticket.description}
+        <div class="ticket-description">{ticket.description}</div>
+      {:else}
+        <p>No description.</p>
+      {/if}
+    </section>
+
+    <section>
       <h3>Dependencies</h3>
       {#if ticket.deps.length > 0}
         <ul>
@@ -105,6 +114,16 @@
 
   .ticket-details h3 {
     margin: 0 0 8px;
+  }
+
+  .ticket-details section + section {
+    margin-top: 16px;
+  }
+
+  .ticket-description {
+    color: var(--text);
+    line-height: 1.5;
+    white-space: pre-wrap;
   }
 
   .ticket-details ul {

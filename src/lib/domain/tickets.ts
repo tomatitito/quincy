@@ -1,5 +1,6 @@
 export type TicketId = string;
 export type TicketTitle = string;
+export type TicketDescription = string;
 export type TicketStatus = "open" | "in_progress" | "closed";
 export type TicketPriority = number;
 export type TicketType = string;
@@ -10,6 +11,7 @@ export type KanbanColumnId = "backlog" | TicketStatus;
 export interface Ticket {
   id: TicketId;
   title: TicketTitle;
+  description: TicketDescription;
   status: TicketStatus;
   priority: TicketPriority;
   type: TicketType;

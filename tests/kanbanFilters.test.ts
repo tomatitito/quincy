@@ -35,7 +35,7 @@ describe("kanban ticket filters", () => {
 });
 
 function ticket(id: string, type: string, status: Ticket["status"], deps: string[], parent: string | undefined): Ticket {
-  return { id, title: id, status, priority: 1, type, deps, parent };
+  return { id, title: id, description: "", status, priority: 1, type, deps, parent };
 }
 
 function columnIds(columns: ReturnType<typeof createKanbanColumns>, columnId: string): string[] {
