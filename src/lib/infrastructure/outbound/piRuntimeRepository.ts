@@ -68,7 +68,7 @@ async function sendInput(publishEvent: AppEventPublisher, sessions: Map<AgentSes
 
 async function loadPiSdk() {
   const packageName = "@earendil-works/pi-coding-" + "agent";
-  return import(packageName) as Promise<{ createAgentSession: (options: unknown) => Promise<{ session: PiAgentSession }>; SessionManager: { create: (cwd?: string) => unknown } }>;
+  return import(/* @vite-ignore */ packageName) as Promise<{ createAgentSession: (options: unknown) => Promise<{ session: PiAgentSession }>; SessionManager: { create: (cwd?: string) => unknown } }>;
 }
 
 function runPrompt(publishEvent: AppEventPublisher, sessionId: AgentSessionId, session: PiAgentSession, input: AgentInputText) {
@@ -95,7 +95,7 @@ function toRuntimeEvent(value: unknown): AgentRuntimeEvent | undefined {
     case "message_start":
       return { type: "message_start", id: eventMessageId(event), role: messageRole(event.message), text: messageText(event.message) };
     case "message_update":
-      return { type: "message_update", id: eventMessageId(event), role: messageRole(event.message), delta: deltaText(event.assistantMessageEvent), text: messageText(event.message) };
+      return { type: "message_update", id: eventMessageId(event), role: messageRole(event.message), delta: deltaText(event.assistantMessageEvent), text: messageText(event.message), contentKind: messageEventContentKind(event.assistantMessageEvent) };
     case "message_end":
       return { type: "message_end", id: eventMessageId(event), role: messageRole(event.message), text: messageText(event.message) };
     case "tool_execution_start":
@@ -177,6 +177,13 @@ function contentText(value: unknown): string {
 function deltaText(value: unknown): string | undefined {
   const record = asRecord(value);
   return stringValue(record?.delta) ?? stringValue(record?.text);
+}
+
+function messageEventContentKind(value: unknown): "text" | "thinking" | undefined {
+  const type = stringValue(asRecord(value)?.type);
+  if (type?.startsWith("thinking_")) return "thinking";
+  if (type?.startsWith("text_")) return "text";
+  return undefined;
 }
 
 function stringValue(value: unknown): string | undefined {

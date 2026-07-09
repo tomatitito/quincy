@@ -36,10 +36,12 @@
 
     const unlistenStatus = appEvents.listen(["agent.status", "agent.status.changed"], handleStatusEvent);
     const unlistenOutput = appEvents.listen(["agent.output", "agent.output.appended"], handleOutputEvent);
+    const unlistenTool = appEvents.listen(["agent.tool.started", "agent.tool.updated", "agent.tool.ended"], handleToolEvent);
 
     return () => {
       unlistenStatus();
       unlistenOutput();
+      unlistenTool();
     };
   });
 
@@ -58,7 +60,7 @@
     const text = stringFrom(payload?.text) ?? stringFrom(payload?.output) ?? stringFrom(payload?.chunk) ?? stringFrom(payload?.line);
     if (text === undefined || text.length === 0 || !acceptAgentEvent(payload)) return;
 
-    output = updateOutput(output, payload, text);
+    output = updateOutput(output, payload, text, outputKindFrom(payload));
     if (status === "empty") {
       status = "running";
       message = defaultMessage("running");
@@ -116,7 +118,7 @@
     if (input.length === 0) return;
     const sessionId = activeSessionId ?? (await startSession())?.sessionId;
     if (sessionId === undefined) return;
-    output = [...output, { key: `user-${crypto.randomUUID()}`, role: "user", text: input }];
+    output = [...output, { key: `user-${crypto.randomUUID()}`, role: "user", kind: "user", text: input }];
     const result = await sendCommand("/api/agent/input", { sessionId, input });
     if (result === undefined) return;
     inputText = "";
@@ -197,23 +199,57 @@
     query: string;
   }
 
-  type AgentOutputRole = "user" | "assistant";
+  type AgentOutputRole = "user" | "assistant" | "tool";
+  type AgentOutputKind = "user" | "thinking" | "answer" | "tool" | "tool-error" | "edit";
 
   interface AgentOutput {
     key?: string;
     role: AgentOutputRole;
+    kind: AgentOutputKind;
     text: string;
   }
 
-  function updateOutput(currentOutput: AgentOutput[], payload: Record<string, unknown> | undefined, text: string): AgentOutput[] {
-    const key = stringFrom(payload?.messageId);
-    const role = roleFrom(payload?.role);
+  function handleToolEvent(event: BrowserAppEvent) {
+    const payload = asRecord(event.payload);
+    if (!acceptAgentEvent(payload)) return;
+    const text = toolText(payload);
+    if (text === undefined) return;
+    output = updateOutput(output, { ...payload, messageId: stringFrom(payload?.toolCallId), strategy: "replace" }, text, toolKind(payload));
+  }
+
+  function updateOutput(currentOutput: AgentOutput[], payload: Record<string, unknown> | undefined, text: string, kind: AgentOutputKind): AgentOutput[] {
+    const rawKey = stringFrom(payload?.messageId);
+    const key = rawKey === undefined ? undefined : `${rawKey}:${kind}`;
+    const role = roleFrom(payload?.role, kind);
     const strategy = payload?.strategy === "replace" ? "replace" : "append";
     const lastIndex = currentOutput.length - 1;
-    const index = key === undefined ? (currentOutput[lastIndex]?.role === role ? lastIndex : -1) : currentOutput.findIndex((entry) => entry.key === key);
-    if (index === -1) return [...currentOutput, { key, role, text }];
+    const index = key === undefined ? (currentOutput[lastIndex]?.kind === kind ? lastIndex : -1) : currentOutput.findIndex((entry) => entry.key === key);
+    if (index === -1) return [...currentOutput, { key, role, kind, text }];
 
-    return currentOutput.map((entry, entryIndex) => (entryIndex === index ? { key: entry.key ?? key, role, text: strategy === "replace" ? text : entry.text + text } : entry));
+    return currentOutput.map((entry, entryIndex) => (entryIndex === index ? { key: entry.key ?? key, role, kind, text: strategy === "replace" ? text : entry.text + text } : entry));
+  }
+
+  function outputKindFrom(payload: Record<string, unknown> | undefined): AgentOutputKind {
+    if (payload?.role === "user") return "user";
+    return payload?.contentKind === "thinking" ? "thinking" : "answer";
+  }
+
+  function toolKind(payload: Record<string, unknown> | undefined): AgentOutputKind {
+    if (payload?.status === "failed" || stringFrom(payload?.error) !== undefined) return "tool-error";
+    if (isEditTool(stringFrom(payload?.name))) return "edit";
+    return "tool";
+  }
+
+  function isEditTool(name: string | undefined): boolean {
+    return name === "edit" || name === "write" || name === "multi_tool_use.parallel";
+  }
+
+  function toolText(payload: Record<string, unknown> | undefined): string | undefined {
+    const name = stringFrom(payload?.name) ?? "tool";
+    const body = stringFrom(payload?.error) ?? stringFrom(payload?.output) ?? stringFrom(payload?.message) ?? stringFrom(payload?.input);
+    const status = stringFrom(payload?.status);
+    const heading = status === undefined ? name : `${name} ${status}`;
+    return body === undefined ? heading : `${heading}\n\n${body}`;
   }
 
   function parseCommandResult(value: unknown): AgentCommandResult | undefined {
@@ -346,8 +382,18 @@
     return "No agent session has reported activity yet.";
   }
 
-  function roleFrom(value: unknown): AgentOutputRole {
+  function roleFrom(value: unknown, kind: AgentOutputKind): AgentOutputRole {
+    if (kind === "tool" || kind === "tool-error" || kind === "edit") return "tool";
     return value === "user" ? "user" : "assistant";
+  }
+
+  function outputLabel(entry: AgentOutput): string {
+    if (entry.kind === "user") return "You";
+    if (entry.kind === "thinking") return "Thinking";
+    if (entry.kind === "tool-error") return "Tool error";
+    if (entry.kind === "edit") return "Edit";
+    if (entry.kind === "tool") return "Tool";
+    return "Pi";
   }
 
   function stringFrom(value: unknown): string | undefined {
@@ -403,8 +449,8 @@
       {#if output.length > 0}
         <div class="agent-output-list" aria-label="Agent output">
           {#each output as entry (entry.key ?? entry.text)}
-            <article class="agent-output-message" class:user-message={entry.role === "user"} class:pi-message={entry.role === "assistant"}>
-              <p>{entry.role === "user" ? "You" : "Pi"}</p>
+            <article class="agent-output-message" class:user-message={entry.kind === "user"} class:thinking-message={entry.kind === "thinking"} class:answer-message={entry.kind === "answer"} class:tool-message={entry.kind === "tool"} class:tool-error-message={entry.kind === "tool-error"} class:edit-message={entry.kind === "edit"}>
+              <p>{outputLabel(entry)}</p>
               <pre>{entry.text}</pre>
             </article>
           {/each}
@@ -705,7 +751,14 @@
   }
 
   .agent-transcript {
-    background: rgb(31, 32, 40);
+    --agent-transcript-bg: rgb(27, 34, 38);
+    --agent-user-bg: rgb(58, 57, 73);
+    --agent-thinking-bg: transparent;
+    --agent-answer-bg: rgb(36, 43, 49);
+    --agent-tool-bg: rgb(34, 49, 36);
+    --agent-tool-error-bg: rgb(59, 38, 38);
+    --agent-edit-bg: rgb(34, 49, 36);
+    background: var(--agent-transcript-bg);
     min-height: 0;
     overflow-x: clip;
     overflow-y: auto;
@@ -727,30 +780,65 @@
   }
 
   .agent-output-message {
-    background: rgb(45, 47, 58);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 10px;
+    background: var(--agent-answer-bg);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 2px;
     padding: 12px;
   }
 
-  .agent-output-message.pi-message {
-    background: rgb(62, 64, 72);
+  .agent-output-message.user-message {
+    background: var(--agent-user-bg);
+  }
+
+  .agent-output-message.thinking-message {
+    background: var(--agent-thinking-bg);
+    border-color: transparent;
+    padding-block: 6px;
+  }
+
+  .agent-output-message.tool-message {
+    background: var(--agent-tool-bg);
+  }
+
+  .agent-output-message.tool-error-message {
+    background: var(--agent-tool-error-bg);
+  }
+
+  .agent-output-message.edit-message {
+    background: var(--agent-edit-bg);
   }
 
   .agent-output-message p {
     color: var(--muted);
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 700;
     letter-spacing: 0.06em;
-    margin: 0 0 6px;
+    margin: 0 0 8px;
     text-transform: uppercase;
+  }
+
+  .agent-output-message.thinking-message p {
+    font-style: italic;
+    text-transform: none;
   }
 
   pre {
     color: var(--text);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     margin: 0;
     overflow: visible;
     white-space: pre-wrap;
+  }
+
+  .thinking-message pre {
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  .tool-message pre,
+  .tool-error-message pre,
+  .edit-message pre {
+    color: rgb(224, 226, 218);
   }
 
   @media (max-width: 1200px) {

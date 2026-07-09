@@ -23,7 +23,7 @@ async function listSessionSummaries(cwd: string): Promise<AgentSessionSummary[]>
 
 async function loadPiSdk() {
   const packageName = "@earendil-works/pi-coding-" + "agent";
-  return import(packageName) as Promise<{ SessionManager: { list: (cwd: string) => Promise<PiSessionInfo[]> } }>;
+  return import(/* @vite-ignore */ packageName) as Promise<{ SessionManager: { list: (cwd: string) => Promise<PiSessionInfo[]> } }>;
 }
 
 function toSessionSummary(session: PiSessionInfo): AgentSessionSummary {

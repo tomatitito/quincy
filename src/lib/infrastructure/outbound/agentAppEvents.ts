@@ -26,6 +26,7 @@ export interface AgentRuntimeEvent {
   role?: string;
   text?: string;
   delta?: string;
+  contentKind?: "text" | "thinking";
   name?: string;
   status?: string;
   message?: string;
@@ -48,8 +49,8 @@ const eventMappers: Record<AgentRuntimeEventType, RuntimeEventMapper> = {
   turn_start: (sessionId, event) => [agentEvent("agent.turn.started", sessionId, { turnId: event.id, message: event.message })],
   turn_end: (sessionId, event) => [agentEvent("agent.turn.ended", sessionId, { turnId: event.id, status: event.status, message: event.message })],
   message_start: (sessionId, event) => [agentEvent("agent.message.started", sessionId, messagePayload(event))],
-  message_update: (sessionId, event) => withOutput(agentEvent("agent.message.updated", sessionId, messagePayload(event)), sessionId, event.id, event.role, event.delta ?? event.text, event.delta === undefined ? "replace" : "append"),
-  message_end: (sessionId, event) => withOutput(agentEvent("agent.message.ended", sessionId, messagePayload(event)), sessionId, event.id, event.role, event.text, "replace"),
+  message_update: (sessionId, event) => withOutput(agentEvent("agent.message.updated", sessionId, messagePayload(event)), sessionId, event.id, event.role, event.delta ?? event.text, event.delta === undefined ? "replace" : "append", event.contentKind),
+  message_end: (sessionId, event) => withOutput(agentEvent("agent.message.ended", sessionId, messagePayload(event)), sessionId, event.id, event.role, event.text, "replace", event.contentKind),
   tool_execution_start: (sessionId, event) => [agentEvent("agent.tool.started", sessionId, toolPayload(event))],
   tool_execution_update: (sessionId, event) => [agentEvent("agent.tool.updated", sessionId, toolPayload(event))],
   tool_execution_end: (sessionId, event) => [agentEvent("agent.tool.ended", sessionId, toolPayload(event))],
@@ -72,13 +73,13 @@ function statusEvent(sessionId: AgentSessionId, status: AgentAppStatus, message:
   return agentEvent("agent.status.changed", sessionId, { status, message });
 }
 
-function withOutput(event: AgentAppEvent, sessionId: AgentSessionId, messageId: string | undefined, role: string | undefined, text: string | undefined, strategy: OutputStrategy): AgentAppEvent[] {
+function withOutput(event: AgentAppEvent, sessionId: AgentSessionId, messageId: string | undefined, role: string | undefined, text: string | undefined, strategy: OutputStrategy, contentKind: AgentRuntimeEvent["contentKind"]): AgentAppEvent[] {
   if (text === undefined || text.length === 0) return [event];
-  return [event, agentEvent("agent.output.appended", sessionId, { messageId, role, strategy, text })];
+  return [event, agentEvent("agent.output.appended", sessionId, { messageId, role, strategy, text, contentKind })];
 }
 
 function messagePayload(event: AgentRuntimeEvent) {
-  return { messageId: event.id, role: event.role, text: event.text, delta: event.delta };
+  return { messageId: event.id, role: event.role, text: event.text, delta: event.delta, contentKind: event.contentKind };
 }
 
 function toolPayload(event: AgentRuntimeEvent) {
