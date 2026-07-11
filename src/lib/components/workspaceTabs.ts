@@ -1,4 +1,4 @@
-export const workspacePanes = ["graph", "kanban", "details"] as const;
+export const workspacePanes = ["graph", "changes", "kanban", "details"] as const;
 export const agentTab = "agent";
 export const workspaceTabs = [...workspacePanes, agentTab] as const;
 

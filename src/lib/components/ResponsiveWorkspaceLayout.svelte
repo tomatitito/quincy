@@ -4,6 +4,8 @@
   import GraphView from "$lib/components/GraphView.svelte";
   import KanbanBoard from "$lib/components/KanbanBoard.svelte";
   import TicketDetails from "$lib/components/TicketDetails.svelte";
+  import RepoChangeGraphView from "$lib/experiments/repoChangeGraph/RepoChangeGraphView.svelte";
+  import type { RepoChangeGraphView as RepoChangeGraphViewData } from "$lib/experiments/repoChangeGraph/repoChangeGraph";
   import type { GraphView as GraphViewData } from "$lib/application/getGraphView";
   import type { KanbanView } from "$lib/application/getKanbanView";
   import { nextLastWorkspaceTab, responsiveWorkspaceState, tabAfterTicketSelection } from "$lib/components/responsiveWorkspace";
@@ -19,6 +21,7 @@
       selectableProjects: SelectableProject[];
       graph: GraphViewData;
       kanban: KanbanView;
+      repoChangeGraph: RepoChangeGraphViewData;
     };
     activeTab: WorkspaceTab;
     selectedTicketId?: string;
@@ -69,6 +72,7 @@
   <section class="tabs" aria-label="Workspace summary">
     <nav class="tabs-nav" aria-label="Views">
       <button type="button" class:active={!agentOverlayOpen && visibleTab === "graph"} onclick={() => selectTab("graph")}>Graph</button>
+      <button type="button" class:active={!agentOverlayOpen && visibleTab === "changes"} onclick={() => selectTab("changes")}>Changes</button>
       <button type="button" class:active={!agentOverlayOpen && visibleTab === "kanban"} onclick={() => selectTab("kanban")}>Kanban</button>
       <button type="button" class:active={!agentOverlayOpen && visibleTab === "details"} onclick={() => selectTab("details")}>Details</button>
       <button type="button" class:active={agentOverlayOpen || activeTab === "agent"} onclick={() => selectTab("agent")}>Agent</button>
@@ -78,6 +82,7 @@
       <span>Open: {openCount}</span>
       <span>Closed: {closedCount}</span>
       <span>Ready: {readyCount}</span>
+      <span>Changed files: {data.repoChangeGraph.nodes.length}</span>
       {#if data.graph.graph.hasCycle}
         <span class="stats-warning">Dependency cycle detected</span>
       {/if}
@@ -88,6 +93,8 @@
     <main class="content">
       {#if visibleTab === "graph"}
         <GraphView tickets={data.graph.tickets} graph={data.graph.graph} initialDirection={graphDirection} {selectedTicketId} onTicketSelect={selectTicket} />
+      {:else if visibleTab === "changes"}
+        <RepoChangeGraphView nodes={data.repoChangeGraph.nodes} graph={data.repoChangeGraph.graph} initialDirection={graphDirection} />
       {:else if visibleTab === "kanban"}
         <KanbanBoard columns={data.kanban.columns} {selectedTicketId} onTicketSelect={selectTicket} />
       {:else if visibleTab === "details"}
@@ -100,6 +107,8 @@
     <main class="content">
       {#if visibleTab === "graph"}
         <GraphView tickets={data.graph.tickets} graph={data.graph.graph} initialDirection={graphDirection} {selectedTicketId} onTicketSelect={selectTicket} />
+      {:else if visibleTab === "changes"}
+        <RepoChangeGraphView nodes={data.repoChangeGraph.nodes} graph={data.repoChangeGraph.graph} initialDirection={graphDirection} />
       {:else if visibleTab === "kanban"}
         <KanbanBoard columns={data.kanban.columns} {selectedTicketId} onTicketSelect={selectTicket} />
       {:else if visibleTab === "details"}
@@ -112,6 +121,8 @@
     <main class="content">
       {#if visibleTab === "graph"}
         <GraphView tickets={data.graph.tickets} graph={data.graph.graph} initialDirection={graphDirection} {selectedTicketId} onTicketSelect={selectTicket} />
+      {:else if visibleTab === "changes"}
+        <RepoChangeGraphView nodes={data.repoChangeGraph.nodes} graph={data.repoChangeGraph.graph} initialDirection={graphDirection} />
       {:else if visibleTab === "kanban"}
         <KanbanBoard columns={data.kanban.columns} {selectedTicketId} onTicketSelect={selectTicket} />
       {:else}
