@@ -9,7 +9,11 @@ interface StubAgentRepositoryDependencies {
 }
 
 export function createStubAgentRepository(dependencies: StubAgentRepositoryDependencies): AgentRepository {
-  return { start: () => startAgent(dependencies), stop: (command) => stopAgent(dependencies, command.sessionId), sendInput: (command) => sendAgentInput(dependencies, command.sessionId, command.input) };
+  return { start: () => startAgent(dependencies), resume: (command) => resumeAgent(command.sessionId), stop: (command) => stopAgent(dependencies, command.sessionId), sendInput: (command) => sendAgentInput(dependencies, command.sessionId, command.input) };
+}
+
+async function resumeAgent(sessionId: AgentSessionId) {
+  return { ...createResult(sessionId, "Agent resume command accepted by stub repository."), transcript: [{ messageId: "stub-message-resumed", role: "assistant" as const, text: "Stub agent session resumed." }] };
 }
 
 async function startAgent({ createSessionId, publishEvent }: StubAgentRepositoryDependencies) {

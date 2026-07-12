@@ -1,4 +1,5 @@
-import type { AgentCommandResult, AgentInputText, AgentRepository, AgentSessionId } from "$lib/domain/ports";
+/* eslint-disable sensors/max-file-lines */
+import type { AgentCommandResult, AgentInputText, AgentRepository, AgentSessionId, AgentTranscriptEntry } from "$lib/domain/ports";
 import { createAgentAppEvents } from "$lib/infrastructure/outbound/agentAppEvents";
 import type { AgentRuntimeEvent } from "$lib/infrastructure/outbound/agentAppEvents";
 import type { AppEventPublisher } from "$lib/infrastructure/outbound/appEventHub";
@@ -7,54 +8,123 @@ interface PiRuntimeRepositoryDependencies {
   createSessionId: () => AgentSessionId;
   cwd: string;
   publishEvent: AppEventPublisher;
+  loadSdk?: () => Promise<PiSdk>;
 }
 
 interface PiAgentSession {
   isStreaming: boolean;
+  messages: unknown[];
   prompt(input: string, options?: { streamingBehavior?: "followUp" }): Promise<void>;
   abort(): Promise<void>;
   subscribe(listener: (event: unknown) => void): () => void;
 }
 
-interface ActivePiSession {
+interface PiAgentSessionRuntime {
   session: PiAgentSession;
+  dispose(): Promise<void>;
+}
+
+interface PiSessionInfo {
+  id: string;
+  path: string;
+}
+
+interface PiSdk {
+  createAgentSessionRuntime: (factory: PiRuntimeFactory, options: { cwd: string; agentDir: string; sessionManager: unknown }) => Promise<PiAgentSessionRuntime>;
+  createAgentSessionFromServices: (options: { services: PiServices; sessionManager: unknown; sessionStartEvent?: unknown }) => Promise<{ session: PiAgentSession }>;
+  createAgentSessionServices: (options: { cwd: string; agentDir: string }) => Promise<PiServices>;
+  getAgentDir: () => string;
+  SessionManager: { create: (cwd?: string) => unknown; open: (path: string) => unknown; list: (cwd: string) => Promise<PiSessionInfo[]> };
+}
+
+interface PiServices {
+  diagnostics: unknown[];
+}
+
+type PiRuntimeFactory = (options: { cwd: string; agentDir: string; sessionManager: unknown; sessionStartEvent?: unknown }) => Promise<{ session: PiAgentSession; services: PiServices; diagnostics: unknown[] }>;
+
+interface ActivePiSession {
+  runtime: PiAgentSessionRuntime;
   unsubscribe: () => void;
 }
 
 type SessionRegistrar = (sessionId: AgentSessionId, session: ActivePiSession) => void;
 
+// eslint-disable-next-line sensors/max-function-lines
 export function createPiRuntimeRepository(dependencies: PiRuntimeRepositoryDependencies): AgentRepository {
   const sessions = new Map<AgentSessionId, ActivePiSession>();
-  const registerSession = (sessionId: AgentSessionId, session: ActivePiSession) => sessions.set(sessionId, session);
+  const registerSession = (sessionId: AgentSessionId, session: ActivePiSession) => {
+    replaceSession(sessions, sessionId, session);
+  };
   return {
     start: (command) => startSession(dependencies, registerSession, command.prompt),
+    resume: (command) => resumeSession(dependencies, registerSession, command.sessionId),
     stop: (command) => stopSession(dependencies.publishEvent, sessions, command.sessionId),
     sendInput: (command) => sendInput(dependencies.publishEvent, sessions, command.sessionId, command.input),
   };
 }
 
-// eslint-disable-next-line sensors/max-function-lines
-async function startSession({ createSessionId, cwd, publishEvent }: PiRuntimeRepositoryDependencies, registerSession: SessionRegistrar, prompt: string | undefined): Promise<AgentCommandResult> {
-  const sessionId = createSessionId();
+async function startSession(dependencies: PiRuntimeRepositoryDependencies, registerSession: SessionRegistrar, prompt: string | undefined): Promise<AgentCommandResult> {
+  const sessionId = dependencies.createSessionId();
+  return activateSession(dependencies, registerSession, sessionId, prompt, (sdk) => sdk.SessionManager.create(dependencies.cwd), "Agent start command accepted.", "Agent session failed to start.");
+}
+
+async function resumeSession(dependencies: PiRuntimeRepositoryDependencies, registerSession: SessionRegistrar, sessionId: AgentSessionId): Promise<AgentCommandResult> {
   try {
-    const { createAgentSession, SessionManager } = await loadPiSdk();
-    const { session } = await createAgentSession({ cwd, sessionManager: SessionManager.create(cwd) });
-    const unsubscribe = session.subscribe((event) => publishPiSessionEvent(publishEvent, sessionId, event));
-    registerSession(sessionId, { session, unsubscribe });
-    publishRuntimeEvents(publishEvent, sessionId, [{ type: "agent_start", message: "Agent session is running." }]);
-    if (prompt !== undefined) runPrompt(publishEvent, sessionId, session, prompt);
-    return createResult(sessionId, "Agent start command accepted.");
+    const sdk = await loadPiSdk(dependencies);
+    const sessionPath = await findSessionPath(sdk, dependencies.cwd, sessionId);
+    if (sessionPath === undefined) return { accepted: false, sessionId, message: "Agent session not found." };
+    return activateSession(dependencies, registerSession, sessionId, undefined, () => sdk.SessionManager.open(sessionPath), "Agent resume command accepted.", "Agent session failed to resume.", sdk);
   } catch (error) {
-    const message = errorMessage(error, "Agent session failed to start.");
-    publishRuntimeEvents(publishEvent, sessionId, [{ type: "agent_end", status: "failed", message }]);
+    return { accepted: false, sessionId, message: errorMessage(error, "Agent session failed to resume.") };
+  }
+}
+
+// eslint-disable-next-line sensors/max-function-lines
+async function activateSession(dependencies: PiRuntimeRepositoryDependencies, registerSession: SessionRegistrar, sessionId: AgentSessionId, prompt: string | undefined, sessionManager: (sdk: PiSdk) => unknown, successMessage: string, failureMessage: string, loadedSdk?: PiSdk): Promise<AgentCommandResult> {
+  try {
+    const sdk = loadedSdk ?? (await loadPiSdk(dependencies));
+    const runtime = await createRuntime(sdk, dependencies.cwd, sessionManager(sdk));
+    const unsubscribe = runtime.session.subscribe((event) => publishPiSessionEvent(dependencies.publishEvent, sessionId, event));
+    registerSession(sessionId, { runtime, unsubscribe });
+    publishRuntimeEvents(dependencies.publishEvent, sessionId, [{ type: "agent_start", message: "Agent session is running." }]);
+    if (prompt !== undefined) runPrompt(dependencies.publishEvent, sessionId, runtime.session, prompt);
+    return { ...createResult(sessionId, successMessage), transcript: transcriptFromMessages(runtime.session.messages) };
+  } catch (error) {
+    const message = errorMessage(error, failureMessage);
+    publishRuntimeEvents(dependencies.publishEvent, sessionId, [{ type: "agent_end", status: "failed", message }]);
     return { accepted: false, sessionId, message };
   }
+}
+
+async function createRuntime(sdk: PiSdk, cwd: string, sessionManager: unknown) {
+  const agentDir = sdk.getAgentDir();
+  return sdk.createAgentSessionRuntime(runtimeFactory(sdk), { cwd, agentDir, sessionManager });
+}
+
+function runtimeFactory(sdk: PiSdk): PiRuntimeFactory {
+  return async ({ cwd, agentDir, sessionManager, sessionStartEvent }) => {
+    const services = await sdk.createAgentSessionServices({ cwd, agentDir });
+    return { ...(await sdk.createAgentSessionFromServices({ services, sessionManager, sessionStartEvent })), services, diagnostics: services.diagnostics };
+  };
+}
+
+async function findSessionPath(sdk: PiSdk, cwd: string, sessionId: AgentSessionId) {
+  return (await sdk.SessionManager.list(cwd)).find((session) => session.id === sessionId)?.path;
+}
+
+function replaceSession(sessions: Map<AgentSessionId, ActivePiSession>, sessionId: AgentSessionId, session: ActivePiSession) {
+  const previous = sessions.get(sessionId);
+  previous?.unsubscribe();
+  void previous?.runtime.dispose().catch(() => undefined);
+  sessions.set(sessionId, session);
+  return sessions;
 }
 
 async function stopSession(publishEvent: AppEventPublisher, sessions: Map<AgentSessionId, ActivePiSession>, sessionId: AgentSessionId): Promise<AgentCommandResult> {
   const activeSession = sessions.get(sessionId);
   if (activeSession === undefined) return { accepted: false, sessionId, message: "Agent session not found." };
-  void activeSession.session.abort().catch((error) => publishRuntimeEvents(publishEvent, sessionId, [{ type: "agent_end", status: "failed", message: errorMessage(error, "Agent session cancellation failed.") }]));
+  void activeSession.runtime.session.abort().catch((error) => publishRuntimeEvents(publishEvent, sessionId, [{ type: "agent_end", status: "failed", message: errorMessage(error, "Agent session cancellation failed.") }]));
   publishRuntimeEvents(publishEvent, sessionId, [{ type: "agent_end", status: "cancelled", cancelled: true, message: "Agent session cancelled." }]);
   return createResult(sessionId, "Agent stop command accepted.");
 }
@@ -62,17 +132,29 @@ async function stopSession(publishEvent: AppEventPublisher, sessions: Map<AgentS
 async function sendInput(publishEvent: AppEventPublisher, sessions: Map<AgentSessionId, ActivePiSession>, sessionId: AgentSessionId, input: AgentInputText): Promise<AgentCommandResult> {
   const activeSession = sessions.get(sessionId);
   if (activeSession === undefined) return { accepted: false, sessionId, message: "Agent session not found." };
-  runPrompt(publishEvent, sessionId, activeSession.session, input);
+  runPrompt(publishEvent, sessionId, activeSession.runtime.session, input);
   return createResult(sessionId, "Agent input command accepted.");
 }
 
-async function loadPiSdk() {
+async function loadPiSdk(dependencies: PiRuntimeRepositoryDependencies) {
+  if (dependencies.loadSdk !== undefined) return dependencies.loadSdk();
   const packageName = "@earendil-works/pi-coding-" + "agent";
-  return import(/* @vite-ignore */ packageName) as Promise<{ createAgentSession: (options: unknown) => Promise<{ session: PiAgentSession }>; SessionManager: { create: (cwd?: string) => unknown } }>;
+  return import(/* @vite-ignore */ packageName) as Promise<PiSdk>;
 }
 
 function runPrompt(publishEvent: AppEventPublisher, sessionId: AgentSessionId, session: PiAgentSession, input: AgentInputText) {
   void session.prompt(input, { streamingBehavior: session.isStreaming ? "followUp" : undefined }).catch((error) => publishRuntimeEvents(publishEvent, sessionId, [{ type: "agent_end", status: "failed", message: errorMessage(error, "Agent prompt failed.") }]));
+}
+
+function transcriptFromMessages(messages: unknown[]): AgentTranscriptEntry[] {
+  return messages.map(transcriptEntry).filter((entry): entry is AgentTranscriptEntry => entry !== undefined);
+}
+
+function transcriptEntry(message: unknown, index: number): AgentTranscriptEntry | undefined {
+  const text = messageText(message);
+  const role = messageRole(message);
+  if (text === undefined || role === undefined) return undefined;
+  return { messageId: messageId(message) ?? `transcript-${index}`, role, text, contentKind: messageContentKind(message) };
 }
 
 function publishPiSessionEvent(publishEvent: AppEventPublisher, sessionId: AgentSessionId, event: unknown) {
@@ -157,21 +239,38 @@ function messageId(message: unknown): string | undefined {
   return stringValue(record?.id) ?? stringValue(record?.messageId);
 }
 
-function messageRole(message: unknown): string | undefined {
-  return stringValue(asRecord(message)?.role);
+function messageRole(message: unknown): "user" | "assistant" | "tool" | undefined {
+  const role = stringValue(asRecord(message)?.role);
+  if (role === "user" || role === "assistant" || role === "tool") return role;
+  if (role === "toolResult" || role === "bashExecution" || role === "custom") return "tool";
+  if (role === "branchSummary" || role === "compactionSummary") return "assistant";
+  return undefined;
 }
 
 function messageText(message: unknown): string | undefined {
   const record = asRecord(message);
   if (typeof record?.errorMessage === "string") return record.errorMessage;
-  const content = record?.content;
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return undefined;
-  return content.map(contentText).filter((text) => text.length > 0).join("");
+  const contentTextValue = messageContentText(record?.content);
+  if (contentTextValue !== undefined) return contentTextValue;
+  return stringValue(record?.output) ?? stringValue(record?.summary);
 }
 
-function contentText(value: unknown): string {
-  return stringValue(asRecord(value)?.text) ?? "";
+function messageContentText(content: unknown): string | undefined {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return undefined;
+  const text = content.map(contentBlockText).filter((part) => part.length > 0).join("");
+  return text.length === 0 ? undefined : text;
+}
+
+function contentBlockText(value: unknown): string {
+  const record = asRecord(value);
+  return stringValue(record?.text) ?? stringValue(record?.thinking) ?? "";
+}
+
+function messageContentKind(message: unknown): "text" | "thinking" | undefined {
+  const content = asRecord(message)?.content;
+  if (!Array.isArray(content)) return undefined;
+  return content.every((value) => asRecord(value)?.type === "thinking") ? "thinking" : "text";
 }
 
 function deltaText(value: unknown): string | undefined {

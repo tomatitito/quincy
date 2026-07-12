@@ -17,6 +17,10 @@ export type AgentCommandAccepted = boolean;
 export type AgentSessionLabel = string;
 export type AgentSessionPreview = string;
 export type AgentSessionLastUsedAt = string;
+export type AgentTranscriptMessageId = string;
+export type AgentTranscriptRole = "user" | "assistant" | "tool";
+export type AgentTranscriptText = string;
+export type AgentTranscriptContentKind = "text" | "thinking";
 
 export interface AgentSessionSummary {
   id: AgentSessionId;
@@ -25,11 +29,22 @@ export interface AgentSessionSummary {
   lastUsedAt: AgentSessionLastUsedAt;
 }
 
+export interface AgentTranscriptEntry {
+  messageId?: AgentTranscriptMessageId;
+  role: AgentTranscriptRole;
+  text: AgentTranscriptText;
+  contentKind?: AgentTranscriptContentKind;
+}
+
 export interface StartAgentSessionCommand {
   prompt?: AgentInputText;
 }
 
 export interface StopAgentSessionCommand {
+  sessionId: AgentSessionId;
+}
+
+export interface ResumeAgentSessionCommand {
   sessionId: AgentSessionId;
 }
 
@@ -42,10 +57,12 @@ export interface AgentCommandResult {
   accepted: AgentCommandAccepted;
   sessionId: AgentSessionId;
   message: AgentCommandMessage;
+  transcript?: AgentTranscriptEntry[];
 }
 
 export interface AgentRepository {
   start(command: StartAgentSessionCommand): Promise<AgentCommandResult>;
+  resume(command: ResumeAgentSessionCommand): Promise<AgentCommandResult>;
   stop(command: StopAgentSessionCommand): Promise<AgentCommandResult>;
   sendInput(command: SendAgentInputCommand): Promise<AgentCommandResult>;
 }

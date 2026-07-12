@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { getAgentSessionSummaries } from "$lib/application/getAgentSessionSummaries";
+import { resumeAgentSession } from "$lib/application/resumeAgentSession";
 import { sendAgentInput } from "$lib/application/sendAgentInput";
 import { startAgentSession } from "$lib/application/startAgentSession";
 import { stopAgentSession } from "$lib/application/stopAgentSession";
@@ -40,6 +41,7 @@ async function handleGetRequest(request: Request, path: string): Promise<Respons
 async function handlePostRequest(request: Request, path: string): Promise<Response> {
   if (path.endsWith("/projects/select")) return handleProjectSelect(request);
   if (path.endsWith("/agent/start")) return Response.json(await handleAgentStart(request));
+  if (path.endsWith("/agent/resume")) return Response.json(await handleAgentResume(request));
   if (path.endsWith("/agent/stop")) return Response.json(await handleAgentStop(request));
   if (path.endsWith("/agent/input")) return Response.json(await handleAgentInput(request));
   return notFoundResponse();
@@ -78,6 +80,13 @@ async function handleAgentStart(request: Request) {
   const body = await readJsonRecord(request);
   const { agentRepository } = await loadProjectRepositories(request);
   return startAgentSession(agentRepository, { prompt: optionalString(body.prompt) });
+}
+
+async function handleAgentResume(request: Request) {
+  const body = await readJsonRecord(request);
+  const sessionId = requiredString(body.sessionId, "sessionId");
+  const { agentRepository } = await loadProjectRepositories(request);
+  return resumeAgentSession(agentRepository, { sessionId });
 }
 
 async function handleAgentStop(request: Request) {

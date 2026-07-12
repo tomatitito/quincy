@@ -113,6 +113,16 @@
     return result;
   }
 
+  async function resumeSession(sessionId: string) {
+    const result = await sendCommand("/api/agent/resume", { sessionId });
+    if (result === undefined) return;
+    activeSessionId = result.sessionId;
+    status = "running";
+    message = "Agent session is running.";
+    output = result.transcript.map(outputFromTranscript);
+    commandMessage = result.message;
+  }
+
   async function sendInput() {
     const input = inputText.trim();
     if (input.length === 0) return;
@@ -180,6 +190,14 @@
     accepted: boolean;
     sessionId: string;
     message: string;
+    transcript: AgentTranscriptEntry[];
+  }
+
+  interface AgentTranscriptEntry {
+    messageId?: string;
+    role: "user" | "assistant" | "tool";
+    text: string;
+    contentKind?: "text" | "thinking";
   }
 
   interface AgentSessionSummary {
@@ -254,11 +272,37 @@
 
   function parseCommandResult(value: unknown): AgentCommandResult | undefined {
     const result = asRecord(value);
-    if (result?.accepted !== true) return undefined;
+    if (result?.accepted !== true) return reportCommandFailure(stringFrom(result?.message) ?? "Agent command failed.");
     const sessionId = stringFrom(result.sessionId);
     const message = stringFrom(result.message);
-    if (sessionId === undefined || message === undefined) return undefined;
-    return { accepted: true, sessionId, message };
+    if (sessionId === undefined || message === undefined) return reportCommandFailure("Agent command failed.");
+    return { accepted: true, sessionId, message, transcript: parseTranscript(result.transcript) };
+  }
+
+  function parseTranscript(value: unknown): AgentTranscriptEntry[] {
+    if (!Array.isArray(value)) return [];
+    return value.map(parseTranscriptEntry).filter((entry): entry is AgentTranscriptEntry => entry !== undefined);
+  }
+
+  function parseTranscriptEntry(value: unknown): AgentTranscriptEntry | undefined {
+    const entry = asRecord(value);
+    const role = transcriptRole(entry?.role);
+    const text = stringFrom(entry?.text);
+    if (role === undefined || text === undefined) return undefined;
+    return { messageId: stringFrom(entry?.messageId), role, text, contentKind: transcriptContentKind(entry?.contentKind) };
+  }
+
+  function transcriptRole(value: unknown): AgentTranscriptEntry["role"] | undefined {
+    return value === "user" || value === "assistant" || value === "tool" ? value : undefined;
+  }
+
+  function transcriptContentKind(value: unknown): AgentTranscriptEntry["contentKind"] | undefined {
+    return value === "text" || value === "thinking" ? value : undefined;
+  }
+
+  function outputFromTranscript(entry: AgentTranscriptEntry, index: number): AgentOutput {
+    const kind = entry.role === "tool" ? "tool" : entry.contentKind === "thinking" ? "thinking" : entry.role === "user" ? "user" : "answer";
+    return { key: entry.messageId ?? `transcript-${index}`, role: entry.role, kind, text: entry.text };
   }
 
   async function updateFileSuggestions(caretPosition = inputText.length) {
@@ -417,13 +461,13 @@
     {#if sessionSummaries.length > 0}
       <div class="agent-session-list">
         {#each sessionSummaries as session (session.id)}
-          <article class="agent-session-row">
-            <h3>{session.label}</h3>
+          <button type="button" class="agent-session-row" class:active={session.id === activeSessionId} aria-current={session.id === activeSessionId ? "true" : undefined} onclick={() => resumeSession(session.id)} disabled={commandBusy}>
+            <span class="session-label">{session.label}</span>
             {#if session.preview.length > 0 && session.preview !== session.label}
-              <p>{session.preview}</p>
+              <span class="session-preview">{session.preview}</span>
             {/if}
             <time datetime={session.lastUsedAt}>{formatLastUsed(session.lastUsedAt)}</time>
-          </article>
+          </button>
         {/each}
       </div>
     {:else}
@@ -529,25 +573,32 @@
     background: rgb(45, 47, 58);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 10px;
+    color: inherit;
+    cursor: pointer;
     display: grid;
     gap: 6px;
     padding: 10px;
+    text-align: left;
   }
 
-  .agent-session-row h3 {
+  .agent-session-row.active {
+    border-color: var(--accent);
+  }
+
+  .session-label {
     color: var(--text);
     font-size: 13px;
-    margin: 0;
+    font-weight: 700;
   }
 
-  .agent-session-row p,
+  .session-preview,
   .agent-session-row time,
   .agent-session-message {
     color: var(--muted);
     margin: 0;
   }
 
-  .agent-session-row p {
+  .session-preview {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
