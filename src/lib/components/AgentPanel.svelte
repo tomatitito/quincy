@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { BrowserAppEvent, BrowserAppEventStream } from "$lib/infrastructure/inbound/browser/appEvents";
+  import { containTabFocus, isBackdropPointerEvent, isVisibleElement } from "$lib/components/agentPanelMobileSheet";
 
   type AgentStatus = "empty" | "running" | "completed" | "failed" | "cancelled";
 
@@ -20,6 +21,11 @@
   let sessionSummaries = $state<AgentSessionSummary[]>([]);
   let output = $state<AgentOutput[]>([]);
   let lastSessionProjectPath = $state<string>();
+  let panelElement = $state<HTMLElement>();
+  let mobileSessionSheetOpen = $state(false);
+  let mobileViewport = $state(false);
+  let mobileSessionsButton = $state<HTMLButtonElement>();
+  let mobileSessionSheet = $state<HTMLElement>();
 
   const statusLabel = $derived(status === "empty" ? "Not connected" : status);
   const canSubmitInput = $derived(inputText.trim().length > 0 && !commandBusy);
@@ -43,6 +49,14 @@
       unlistenOutput();
       unlistenTool();
     };
+  });
+
+  $effect(() => {
+    const query = window.matchMedia("(max-width: 760px)");
+    syncMobileViewport(query);
+    const handleChange = () => syncMobileViewport(query);
+    query.addEventListener("change", handleChange);
+    return () => query.removeEventListener("change", handleChange);
   });
 
   function handleStatusEvent(event: BrowserAppEvent) {
@@ -121,6 +135,8 @@
     message = "Agent session is running.";
     output = result.transcript.map(outputFromTranscript);
     commandMessage = result.message;
+    closeMobileSessionSheet();
+    panelElement?.dispatchEvent(new CustomEvent("agent-session-selected", { bubbles: true }));
   }
 
   async function sendInput() {
@@ -165,7 +181,37 @@
   function handleKeydown(event: KeyboardEvent) {
     if (event.key !== "Escape") return;
     event.preventDefault();
+    if (mobileSessionSheetOpen) {
+      closeMobileSessionSheet();
+      return;
+    }
     void stopActiveSession();
+  }
+
+  function syncMobileViewport(query: MediaQueryList) {
+    mobileViewport = query.matches;
+    if (!query.matches) closeMobileSessionSheet(false);
+  }
+
+  function openMobileSessionSheet() {
+    mobileSessionSheetOpen = true;
+    queueMicrotask(() => mobileSessionSheet?.focus());
+  }
+
+  function closeMobileSessionSheet(restoreFocus = true) {
+    if (!mobileSessionSheetOpen) return;
+    mobileSessionSheetOpen = false;
+    if (restoreFocus) queueMicrotask(() => {
+      if (isVisibleElement(mobileSessionsButton)) mobileSessionsButton.focus();
+    });
+  }
+
+  function handleMobileSessionSheetKeydown(event: KeyboardEvent) {
+    containTabFocus(event, mobileSessionSheet);
+  }
+
+  function handleMobileSessionBackdropPointerdown(event: PointerEvent) {
+    if (isBackdropPointerEvent(event)) closeMobileSessionSheet();
   }
 
   async function sendCommand(url: string, body: Record<string, unknown>): Promise<AgentCommandResult | undefined> {
@@ -451,39 +497,44 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<section class="agent-panel" aria-label="Agent panel">
-  <aside class="agent-session-sidebar" aria-label="Repository agent sessions">
+{#snippet sessionList()}
+  {#if sessionSummaries.length > 0}
+    <div class="agent-session-list">
+      {#each sessionSummaries as session (session.id)}
+        <button type="button" class="agent-session-row" class:active={session.id === activeSessionId} aria-current={session.id === activeSessionId ? "true" : undefined} onclick={() => resumeSession(session.id)} disabled={commandBusy}>
+          <span class="session-label">{session.label}</span>
+          {#if session.preview.length > 0 && session.preview !== session.label}
+            <span class="session-preview">{session.preview}</span>
+          {/if}
+          <time datetime={session.lastUsedAt}>{formatLastUsed(session.lastUsedAt)}</time>
+        </button>
+      {/each}
+    </div>
+  {:else}
+    <p class="agent-session-message">{sessionListMessage}</p>
+  {/if}
+{/snippet}
+
+<section bind:this={panelElement} class="agent-panel" aria-label="Agent panel">
+  <aside class="agent-session-sidebar" aria-label="Repository agent sessions" inert={mobileSessionSheetOpen && mobileViewport}>
     <div class="sidebar-header">
       <p class="eyebrow">Sessions</p>
       <button type="button" onclick={() => loadSessionSummaries()} disabled={sessionListBusy}>Refresh</button>
     </div>
 
-    {#if sessionSummaries.length > 0}
-      <div class="agent-session-list">
-        {#each sessionSummaries as session (session.id)}
-          <button type="button" class="agent-session-row" class:active={session.id === activeSessionId} aria-current={session.id === activeSessionId ? "true" : undefined} onclick={() => resumeSession(session.id)} disabled={commandBusy}>
-            <span class="session-label">{session.label}</span>
-            {#if session.preview.length > 0 && session.preview !== session.label}
-              <span class="session-preview">{session.preview}</span>
-            {/if}
-            <time datetime={session.lastUsedAt}>{formatLastUsed(session.lastUsedAt)}</time>
-          </button>
-        {/each}
-      </div>
-    {:else}
-      <p class="agent-session-message">{sessionListMessage}</p>
-    {/if}
+    {@render sessionList()}
   </aside>
 
-  <div class="agent-session-activity">
+  <div class="agent-session-activity" inert={mobileSessionSheetOpen && mobileViewport}>
     <header>
       <div>
         <p class="eyebrow">Agent</p>
         <h2>Session activity</h2>
       </div>
       <div class="agent-header-actions">
+        <button bind:this={mobileSessionsButton} type="button" class="mobile-sessions-button" aria-haspopup="dialog" aria-expanded={mobileSessionSheetOpen} onclick={openMobileSessionSheet}>Sessions</button>
         <button type="button" onclick={startSession} disabled={commandBusy}>Start session</button>
-        <span class:running={status === "running"} class:completed={status === "completed"} class:failed={status === "failed"} class:cancelled={status === "cancelled"}>{statusLabel}</span>
+        <span class="agent-status" class:running={status === "running"} class:completed={status === "completed"} class:failed={status === "failed"} class:cancelled={status === "cancelled"}>{statusLabel}</span>
       </div>
     </header>
 
@@ -524,6 +575,24 @@
       </div>
     </section>
   </div>
+
+  {#if mobileSessionSheetOpen}
+    <div class="session-sheet-backdrop" aria-hidden="true" onpointerdown={handleMobileSessionBackdropPointerdown}></div>
+    <div bind:this={mobileSessionSheet} class="session-bottom-sheet" role="dialog" aria-modal="true" aria-labelledby="mobile-session-sheet-title" tabindex="-1" onkeydown={handleMobileSessionSheetKeydown}>
+      <div class="sidebar-header">
+        <div>
+          <p class="eyebrow">Sessions</p>
+          <h2 id="mobile-session-sheet-title">Repository sessions</h2>
+        </div>
+        <div class="session-sheet-actions">
+          <button type="button" onclick={() => loadSessionSummaries()} disabled={sessionListBusy}>Refresh</button>
+          <button type="button" onclick={() => closeMobileSessionSheet()}>Close</button>
+        </div>
+      </div>
+
+      {@render sessionList()}
+    </div>
+  {/if}
 </section>
 
 <style>
@@ -635,7 +704,7 @@
     margin: 0;
   }
 
-  span {
+  .agent-status {
     border: 1px solid var(--dim);
     border-radius: 999px;
     color: var(--muted);
@@ -679,6 +748,12 @@
     flex-wrap: wrap;
     gap: 8px;
     justify-content: flex-end;
+  }
+
+  .mobile-sessions-button,
+  .session-sheet-backdrop,
+  .session-bottom-sheet {
+    display: none;
   }
 
   .agent-chat-input {
@@ -907,12 +982,48 @@
   @media (max-width: 760px) {
     .agent-panel {
       grid-template-columns: 1fr;
-      grid-template-rows: minmax(140px, 32%) minmax(0, 1fr);
     }
 
     .agent-session-sidebar {
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      border-right: 0;
+      display: none;
+    }
+
+    .mobile-sessions-button {
+      display: inline-block;
+    }
+
+    .session-sheet-backdrop {
+      background: rgba(0, 0, 0, 0.5);
+      border: 0;
+      border-radius: 0;
+      display: block;
+      inset: 0;
+      padding: 0;
+      position: fixed;
+      z-index: 20;
+    }
+
+    .session-bottom-sheet {
+      background: var(--container-bg);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 18px 18px 0 0;
+      bottom: 0;
+      box-shadow: 0 -18px 48px rgba(0, 0, 0, 0.45);
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      left: 0;
+      max-height: min(72vh, 560px);
+      min-height: 240px;
+      outline: none;
+      overflow: hidden;
+      position: fixed;
+      right: 0;
+      z-index: 21;
+    }
+
+    .session-sheet-actions {
+      display: flex;
+      gap: 8px;
     }
 
     header {
@@ -952,7 +1063,6 @@
   @media (max-width: 420px) {
     .agent-panel {
       font-size: 12px;
-      grid-template-rows: minmax(120px, 30%) minmax(0, 1fr);
     }
 
     header {
