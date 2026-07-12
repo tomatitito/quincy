@@ -1,5 +1,23 @@
 # Configuration
 
+## Build and run
+
+Install dependencies, build production server, then start it:
+
+```sh
+bun install
+bun run build
+bun run start
+```
+
+Quincy listens on `http://localhost:3000` by default. Set adapter-node environment variables to change server binding, for example:
+
+```sh
+HOST=127.0.0.1 PORT=8080 bun run start
+```
+
+## Project configuration
+
 Quincy reads tickets from active project's ticket directory. If no config is present, active project defaults to `process.cwd()` and ticket directory defaults to `.tickets`.
 
 ## User project config
