@@ -6,9 +6,10 @@
 
   interface Props {
     ticket?: TicketView;
+    onAgentStart?: (ticket: TicketView) => void;
   }
 
-  let { ticket }: Props = $props();
+  let { ticket, onAgentStart }: Props = $props();
   let htmlEnabled = $state(false);
   let previousTicketId = $state<string | undefined>();
 
@@ -50,7 +51,10 @@
         <strong>{ticket.id}</strong>
         <h2>{ticket.title}</h2>
       </div>
-      <span class={`status-badge status-${ticket.status.replace("_", "-")}`}>{ticket.status}</span>
+      <div class="ticket-actions">
+        <span class={`status-badge status-${ticket.status.replace("_", "-")}`}>{ticket.status}</span>
+        <button type="button" onclick={() => onAgentStart?.(ticket)}>Start agent</button>
+      </div>
     </header>
 
     <dl>
@@ -138,6 +142,24 @@
     font-size: 14px;
     line-height: 1.4;
     margin: 4px 0 0;
+  }
+
+  .ticket-actions {
+    align-items: flex-end;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .ticket-actions button {
+    background: var(--body-bg);
+    border: 1px solid var(--dim);
+    border-radius: 3px;
+    color: var(--text);
+    cursor: pointer;
+    font: inherit;
+    padding: 5px 8px;
+    white-space: nowrap;
   }
 
   .ticket-details dl {

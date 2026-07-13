@@ -11,7 +11,9 @@
   import { nextLastWorkspaceTab, responsiveWorkspaceState, tabAfterTicketSelection } from "$lib/components/responsiveWorkspace";
   import type { WorkspacePane, WorkspaceTab } from "$lib/components/workspaceTabs";
   import type { SelectableProject } from "$lib/domain/ports";
+  import type { TicketView } from "$lib/domain/tickets";
   import type { BrowserAppEventStream } from "$lib/infrastructure/inbound/browser/appEvents";
+  import { createTicketAgentStartRequest, type AgentStartRequest } from "$lib/components/ticketAgentStartRequest";
   import { viewportMode } from "$lib/infrastructure/inbound/browser/viewportMode";
 
   interface Props {
@@ -34,6 +36,7 @@
 
   let { data, activeTab, selectedTicketId, appEvents, onRefresh, onProjectSelect, onTabChange, onTicketSelect }: Props = $props();
   let lastWorkspaceTab = $state<WorkspacePane>("graph");
+  let agentStartRequest = $state<AgentStartRequest>();
 
   const tickets = $derived(data.graph.tickets);
   const openCount = $derived(tickets.filter((ticket) => ticket.status === "open").length);
@@ -55,6 +58,15 @@
 
   function closeAgentOverlay() {
     onTabChange(lastWorkspaceTab);
+  }
+
+  function startAgentForTicket(ticket: TicketView) {
+    agentStartRequest = createTicketAgentStartRequest(ticket, crypto.randomUUID());
+    onTabChange("agent");
+  }
+
+  function clearAgentStartRequest(requestId: string) {
+    if (agentStartRequest?.id === requestId) agentStartRequest = undefined;
   }
 
   function selectTicket(ticketId: string) {
@@ -98,9 +110,9 @@
       {:else if visibleTab === "kanban"}
         <KanbanBoard columns={data.kanban.columns} {selectedTicketId} onTicketSelect={selectTicket} />
       {:else if visibleTab === "details"}
-        <TicketDetails ticket={selectedTicket} />
+        <TicketDetails ticket={selectedTicket} onAgentStart={startAgentForTicket} />
       {:else}
-        <AgentPanel {appEvents} projectPath={data.projectPath} />
+        <AgentPanel {appEvents} projectPath={data.projectPath} startRequest={agentStartRequest} onStartRequestHandled={clearAgentStartRequest} />
       {/if}
     </main>
   {:else if $viewportMode === "tablet"}
@@ -112,9 +124,9 @@
       {:else if visibleTab === "kanban"}
         <KanbanBoard columns={data.kanban.columns} {selectedTicketId} onTicketSelect={selectTicket} />
       {:else if visibleTab === "details"}
-        <TicketDetails ticket={selectedTicket} />
+        <TicketDetails ticket={selectedTicket} onAgentStart={startAgentForTicket} />
       {:else}
-        <AgentPanel {appEvents} projectPath={data.projectPath} />
+        <AgentPanel {appEvents} projectPath={data.projectPath} startRequest={agentStartRequest} onStartRequestHandled={clearAgentStartRequest} />
       {/if}
     </main>
   {:else}
@@ -126,7 +138,7 @@
       {:else if visibleTab === "kanban"}
         <KanbanBoard columns={data.kanban.columns} {selectedTicketId} onTicketSelect={selectTicket} />
       {:else}
-        <TicketDetails ticket={selectedTicket} />
+        <TicketDetails ticket={selectedTicket} onAgentStart={startAgentForTicket} />
       {/if}
     </main>
 
@@ -137,7 +149,7 @@
           <h2>Agent</h2>
         </header>
         <div class="mobile-agent-overlay-body">
-          <AgentPanel {appEvents} projectPath={data.projectPath} />
+          <AgentPanel {appEvents} projectPath={data.projectPath} startRequest={agentStartRequest} onStartRequestHandled={clearAgentStartRequest} />
         </div>
       </section>
     {/if}

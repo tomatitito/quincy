@@ -1,10 +1,18 @@
 <script lang="ts">
   import type { BrowserAppEvent, BrowserAppEventStream } from "$lib/infrastructure/inbound/browser/appEvents";
   import { containTabFocus, isBackdropPointerEvent, isVisibleElement } from "$lib/components/agentPanelMobileSheet";
+  import type { AgentStartRequest } from "$lib/components/ticketAgentStartRequest";
 
   type AgentStatus = "empty" | "running" | "completed" | "failed" | "cancelled";
 
-  let { appEvents, projectPath }: { appEvents?: BrowserAppEventStream; projectPath: string } = $props();
+  interface Props {
+    appEvents?: BrowserAppEventStream;
+    projectPath: string;
+    startRequest?: AgentStartRequest;
+    onStartRequestHandled?: (requestId: string) => void;
+  }
+
+  let { appEvents, projectPath, startRequest, onStartRequestHandled }: Props = $props();
 
   let status = $state<AgentStatus>("empty");
   let message = $state("No agent session has reported activity yet.");
@@ -26,6 +34,7 @@
   let mobileViewport = $state(false);
   let mobileSessionsButton = $state<HTMLButtonElement>();
   let mobileSessionSheet = $state<HTMLElement>();
+  let handledStartRequestId = $state<string>();
 
   const statusLabel = $derived(status === "empty" ? "Not connected" : status);
   const canSubmitInput = $derived(inputText.trim().length > 0 && !commandBusy);
@@ -35,6 +44,13 @@
     lastSessionProjectPath = projectPath;
     resetSessionState();
     void loadSessionSummaries(projectPath);
+  });
+
+  $effect(() => {
+    if (startRequest === undefined || startRequest.id === handledStartRequestId) return;
+    handledStartRequestId = startRequest.id;
+    onStartRequestHandled?.(startRequest.id);
+    void startSession(startRequest.prompt);
   });
 
   $effect(() => {
@@ -118,8 +134,8 @@
     sessionListMessage = "Loading repository sessions…";
   }
 
-  async function startSession() {
-    const result = await sendCommand("/api/agent/start", {});
+  async function startSession(prompt?: string) {
+    const result = await sendCommand("/api/agent/start", prompt === undefined ? {} : { prompt });
     if (result === undefined) return undefined;
     activeSessionId = result.sessionId;
     commandMessage = result.message;
@@ -533,7 +549,7 @@
       </div>
       <div class="agent-header-actions">
         <button bind:this={mobileSessionsButton} type="button" class="mobile-sessions-button" aria-haspopup="dialog" aria-expanded={mobileSessionSheetOpen} onclick={openMobileSessionSheet}>Sessions</button>
-        <button type="button" onclick={startSession} disabled={commandBusy}>Start session</button>
+        <button type="button" onclick={() => startSession()} disabled={commandBusy}>Start session</button>
         <span class="agent-status" class:running={status === "running"} class:completed={status === "completed"} class:failed={status === "failed"} class:cancelled={status === "cancelled"}>{statusLabel}</span>
       </div>
     </header>
