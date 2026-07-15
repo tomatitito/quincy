@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { BrowserAppEvent, BrowserAppEventStream } from "$lib/infrastructure/inbound/browser/appEvents";
+  import { agentOutputEventTypes, agentOutputText, normalizeAgentOutputPayload } from "$lib/components/agentOutputEvents";
   import { containTabFocus, isBackdropPointerEvent, isVisibleElement } from "$lib/components/agentPanelMobileSheet";
   import type { AgentStartRequest } from "$lib/components/ticketAgentStartRequest";
 
@@ -57,7 +58,7 @@
     if (appEvents === undefined) return;
 
     const unlistenStatus = appEvents.listen(["agent.status", "agent.status.changed"], handleStatusEvent);
-    const unlistenOutput = appEvents.listen(["agent.output", "agent.output.appended"], handleOutputEvent);
+    const unlistenOutput = appEvents.listen([...agentOutputEventTypes], handleOutputEvent);
     const unlistenTool = appEvents.listen(["agent.tool.started", "agent.tool.updated", "agent.tool.ended"], handleToolEvent);
 
     return () => {
@@ -86,8 +87,8 @@
   }
 
   function handleOutputEvent(event: BrowserAppEvent) {
-    const payload = asRecord(event.payload);
-    const text = stringFrom(payload?.text) ?? stringFrom(payload?.output) ?? stringFrom(payload?.chunk) ?? stringFrom(payload?.line);
+    const payload = normalizeAgentOutputPayload(event.type, asRecord(event.payload));
+    const text = agentOutputText(payload);
     if (text === undefined || text.length === 0 || !acceptAgentEvent(payload)) return;
 
     output = updateOutput(output, payload, text, outputKindFrom(payload));
