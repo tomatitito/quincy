@@ -8,7 +8,7 @@ const textEncoder = new TextEncoder();
 const configProvider = createConfigProvider();
 
 export async function handleAppEventStreamRequest(request: Request): Promise<Response> {
-  const config = await configProvider({ selectedProjectPath: readSelectedProjectFromRequest(request) });
+  const config = await configProvider({ selectedProjectPath: selectedProjectPathFromRequest(request) });
   // Lazily start the ticket event producer when the first browser event stream connects.
   // If more event producers need startup logic, move this into an app composition/bootstrap helper.
   startTicketFileChangeEvents(config.ticketDirectory);
@@ -21,6 +21,10 @@ function sseHeaders(): HeadersInit {
     connection: "keep-alive",
     "content-type": "text/event-stream",
   };
+}
+
+function selectedProjectPathFromRequest(request: Request) {
+  return new URL(request.url).searchParams.get("projectPath") ?? readSelectedProjectFromRequest(request);
 }
 
 function createAppEventStream(request: Request): ReadableStream<Uint8Array> {

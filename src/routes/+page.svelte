@@ -24,7 +24,7 @@
       body: JSON.stringify({ projectPath }),
     });
     selectedTicketId = undefined;
-    reconnectAppEvents();
+    reconnectAppEvents(projectPath);
     await invalidateAll();
   }
 
@@ -36,9 +36,9 @@
     selectedTicketId = ticketId;
   }
 
-  function reconnectAppEvents() {
+  function reconnectAppEvents(projectPath = data.projectPath) {
     closeAppEvents();
-    appEvents = openAppEventStream("/events");
+    appEvents = openAppEventStream(`/events?projectPath=${encodeURIComponent(projectPath)}`);
     unlistenTickets = appEvents.listen(["tickets.changed"], refreshTickets);
   }
 
