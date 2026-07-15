@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { invalidateAll } from "$app/navigation";
+  import { goto, invalidateAll } from "$app/navigation";
   import { onMount } from "svelte";
   import ResponsiveWorkspaceLayout from "$lib/components/ResponsiveWorkspaceLayout.svelte";
   import type { WorkspaceTab } from "$lib/components/workspaceTabs";
@@ -18,14 +18,23 @@
   }
 
   async function selectProject(projectPath: string) {
-    await fetch("/api/projects/select", {
+    const response = await fetch("/api/projects/select", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ projectPath }),
     });
+    if (!response.ok) return;
+    const selectedProject = (await response.json()) as { projectPath: string };
     selectedTicketId = undefined;
-    reconnectAppEvents(projectPath);
-    await invalidateAll();
+    reconnectAppEvents(selectedProject.projectPath);
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set("projectPath", selectedProject.projectPath);
+    await goto(`${nextUrl.pathname}?${nextUrl.searchParams.toString()}`, {
+      invalidateAll: true,
+      keepFocus: true,
+      noScroll: true,
+      replaceState: true,
+    });
   }
 
   function selectTab(tab: WorkspaceTab) {
