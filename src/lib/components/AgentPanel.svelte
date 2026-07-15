@@ -968,6 +968,7 @@
     color: var(--text);
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     margin: 0;
+    max-width: 100%;
     overflow: visible;
     white-space: pre-wrap;
   }
@@ -1052,6 +1053,13 @@
 
     .agent-transcript {
       padding: 12px;
+    }
+
+    .agent-output-message pre {
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      white-space: pre;
     }
 
     .agent-commands {
