@@ -2,6 +2,7 @@
   import type { BrowserAppEvent, BrowserAppEventStream } from "$lib/infrastructure/inbound/browser/appEvents";
   import { agentOutputEventTypes, agentOutputText, normalizeAgentOutputPayload } from "$lib/components/agentOutputEvents";
   import { containTabFocus, isBackdropPointerEvent, isVisibleElement } from "$lib/components/agentPanelMobileSheet";
+  import { isCollapsibleToolOutput, shouldShowToolOutputBody, toolOutputPreview, toolOutputTitle, type AgentTranscriptEntryKind } from "$lib/components/agentToolOutput";
   import type { AgentStartRequest } from "$lib/components/ticketAgentStartRequest";
 
   type AgentStatus = "empty" | "running" | "completed" | "failed" | "cancelled";
@@ -36,6 +37,7 @@
   let mobileSessionsButton = $state<HTMLButtonElement>();
   let mobileSessionSheet = $state<HTMLElement>();
   let handledStartRequestId = $state<string>();
+  let expandedToolOutputKeys = $state<string[]>([]);
 
   const statusLabel = $derived(status === "empty" ? "Not connected" : status);
   const canSubmitInput = $derived(inputText.trim().length > 0 && !commandBusy);
@@ -132,6 +134,7 @@
     activeSessionId = undefined;
     sessionSummaries = [];
     output = [];
+    expandedToolOutputKeys = [];
     sessionListMessage = "Loading repository sessions…";
   }
 
@@ -281,7 +284,7 @@
   }
 
   type AgentOutputRole = "user" | "assistant" | "tool";
-  type AgentOutputKind = "user" | "thinking" | "answer" | "tool" | "tool-error" | "edit";
+  type AgentOutputKind = AgentTranscriptEntryKind;
 
   interface AgentOutput {
     key?: string;
@@ -503,6 +506,19 @@
     return "Pi";
   }
 
+  function toggleToolOutput(entry: AgentOutput) {
+    const key = toolOutputKey(entry);
+    expandedToolOutputKeys = expandedToolOutputKeys.includes(key) ? expandedToolOutputKeys.filter((entryKey) => entryKey !== key) : [...expandedToolOutputKeys, key];
+  }
+
+  function toolOutputExpanded(entry: AgentOutput): boolean {
+    return expandedToolOutputKeys.includes(toolOutputKey(entry));
+  }
+
+  function toolOutputKey(entry: AgentOutput): string {
+    return entry.key ?? `${entry.kind}:${entry.text}`;
+  }
+
   function stringFrom(value: unknown): string | undefined {
     return typeof value === "string" ? value : undefined;
   }
@@ -563,7 +579,18 @@
           {#each output as entry (entry.key ?? entry.text)}
             <article class="agent-output-message" class:user-message={entry.kind === "user"} class:thinking-message={entry.kind === "thinking"} class:answer-message={entry.kind === "answer"} class:tool-message={entry.kind === "tool"} class:tool-error-message={entry.kind === "tool-error"} class:edit-message={entry.kind === "edit"}>
               <p>{outputLabel(entry)}</p>
-              <pre>{entry.text}</pre>
+              {#if mobileViewport && isCollapsibleToolOutput(entry.kind)}
+                <button type="button" class="tool-output-toggle" aria-expanded={toolOutputExpanded(entry)} onclick={() => toggleToolOutput(entry)}>
+                  <span class="tool-output-summary">
+                    <span class="tool-output-title">{toolOutputTitle(entry.text)}</span>
+                    <span class="tool-output-preview">{toolOutputPreview(entry.text)}</span>
+                  </span>
+                  <span class="tool-output-action">{toolOutputExpanded(entry) ? "Hide" : "Show"}</span>
+                </button>
+              {/if}
+              {#if shouldShowToolOutputBody(mobileViewport, entry.kind, toolOutputExpanded(entry))}
+                <pre>{entry.text}</pre>
+              {/if}
             </article>
           {/each}
         </div>
@@ -960,6 +987,48 @@
     text-transform: uppercase;
   }
 
+  .tool-output-toggle {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    margin: 0 0 8px;
+    padding: 8px 10px;
+    text-align: left;
+    width: 100%;
+  }
+
+  .tool-output-summary {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .tool-output-title {
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .tool-output-preview,
+  .tool-output-action {
+    color: var(--muted);
+    font-size: 11px;
+  }
+
+  .tool-output-preview {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .tool-output-action {
+    flex-shrink: 0;
+  }
+
   .agent-output-message.thinking-message p {
     font-style: italic;
     text-transform: none;
@@ -1061,6 +1130,10 @@
       overflow-y: hidden;
       -webkit-overflow-scrolling: touch;
       white-space: pre;
+    }
+
+    .tool-output-toggle {
+      min-height: 44px;
     }
 
     .agent-commands {
