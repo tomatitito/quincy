@@ -1,4 +1,5 @@
 /* eslint-disable sensors/max-file-lines */
+import path from "node:path";
 import type { AgentCommandResult, AgentInputText, AgentRepository, AgentSessionId, AgentTranscriptEntry } from "$lib/domain/ports";
 import { createAgentAppEvents } from "$lib/infrastructure/outbound/agentAppEvents";
 import type { AgentRuntimeEvent } from "$lib/infrastructure/outbound/agentAppEvents";
@@ -32,7 +33,7 @@ interface PiSessionInfo {
 interface PiSdk {
   createAgentSessionRuntime: (factory: PiRuntimeFactory, options: { cwd: string; agentDir: string; sessionManager: unknown }) => Promise<PiAgentSessionRuntime>;
   createAgentSessionFromServices: (options: { services: PiServices; sessionManager: unknown; sessionStartEvent?: unknown }) => Promise<{ session: PiAgentSession }>;
-  createAgentSessionServices: (options: { cwd: string; agentDir: string }) => Promise<PiServices>;
+  createAgentSessionServices: (options: { cwd: string; agentDir: string; resourceLoaderOptions?: { additionalExtensionPaths?: string[] } }) => Promise<PiServices>;
   getAgentDir: () => string;
   SessionManager: { create: (cwd?: string) => unknown; open: (path: string) => unknown; list: (cwd: string) => Promise<PiSessionInfo[]> };
 }
@@ -104,9 +105,13 @@ async function createRuntime(sdk: PiSdk, cwd: string, sessionManager: unknown) {
 
 function runtimeFactory(sdk: PiSdk): PiRuntimeFactory {
   return async ({ cwd, agentDir, sessionManager, sessionStartEvent }) => {
-    const services = await sdk.createAgentSessionServices({ cwd, agentDir });
+    const services = await sdk.createAgentSessionServices({ cwd, agentDir, resourceLoaderOptions: { additionalExtensionPaths: [delegationExtensionPath()] } });
     return { ...(await sdk.createAgentSessionFromServices({ services, sessionManager, sessionStartEvent })), services, diagnostics: services.diagnostics };
   };
+}
+
+function delegationExtensionPath() {
+  return path.resolve(process.cwd(), "pi/extensions/delegation/index.ts");
 }
 
 async function findSessionPath(sdk: PiSdk, cwd: string, sessionId: AgentSessionId) {

@@ -29,6 +29,14 @@ describe("createPiRuntimeRepository", () => {
     expect(scenario.calls).not.toContain("create:/repo");
   });
 
+  test("loads Quincy delegation extension into pi services", async () => {
+    const scenario = createScenario();
+
+    await scenario.repository.resume({ sessionId: "persisted-session" });
+
+    expect(scenario.calls).toContain("services:delegation-extension");
+  });
+
   test("continues resumed session without creating replacement", async () => {
     const scenario = createScenario();
 
@@ -70,7 +78,10 @@ function createSession(calls: string[]) {
 function createSdk(calls: string[], session: ReturnType<typeof createSession>): any {
   return {
     getAgentDir: () => "/agent",
-    createAgentSessionServices: async () => ({ diagnostics: [] }),
+    createAgentSessionServices: async (options: { resourceLoaderOptions?: { additionalExtensionPaths?: string[] } }) => {
+      calls.push(options.resourceLoaderOptions?.additionalExtensionPaths?.includes("/Users/dusty/devel/quincy/pi/extensions/delegation/index.ts") === true ? "services:delegation-extension" : "services:no-extension");
+      return { diagnostics: [] };
+    },
     createAgentSessionFromServices: async () => ({ session }),
     createAgentSessionRuntime: async (factory: (options: any) => Promise<unknown>, options: { sessionManager: unknown }) => {
       calls.push(`runtime:${String(options.sessionManager)}`);
