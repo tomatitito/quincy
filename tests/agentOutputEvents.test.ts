@@ -5,7 +5,7 @@ import { agentOutputEventTypes, agentOutputText, normalizeAgentOutputPayload } f
 
 describe("agent output events", () => {
   test("includes streaming message app events", () => {
-    expect(agentOutputEventTypes).toEqual(["agent.output", "agent.output.appended", "agent.message.updated", "agent.message.ended"]);
+    expect(agentOutputEventTypes).toEqual(["agent.output", "agent.output.appended", "agent.message.started", "agent.message.updated", "agent.message.ended"]);
   });
 
   test("prefers streaming delta text over finalized message text", () => {
@@ -13,6 +13,7 @@ describe("agent output events", () => {
   });
 
   test("maps streaming message events to output update strategies", () => {
+    expect(normalizeAgentOutputPayload("agent.message.started", { messageId: "m1", text: "Hello" })).toEqual({ messageId: "m1", text: "Hello", strategy: "replace" });
     expect(normalizeAgentOutputPayload("agent.message.updated", { messageId: "m1", delta: "Hello" })).toEqual({ messageId: "m1", delta: "Hello", strategy: "append" });
     expect(normalizeAgentOutputPayload("agent.message.updated", { messageId: "m1", text: "Hello world" })).toEqual({ messageId: "m1", text: "Hello world", strategy: "replace" });
     expect(normalizeAgentOutputPayload("agent.message.ended", { messageId: "m1", text: "Hello world" })).toEqual({ messageId: "m1", text: "Hello world", strategy: "replace" });

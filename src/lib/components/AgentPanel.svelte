@@ -85,7 +85,11 @@
 
     status = nextStatus;
     message = stringFrom(payload?.message) ?? defaultMessage(nextStatus);
-    if (nextStatus === "completed" || nextStatus === "failed" || nextStatus === "cancelled") void loadSessionSummaries();
+    if (nextStatus === "completed" || nextStatus === "failed" || nextStatus === "cancelled") {
+      void loadSessionSummaries();
+      const sessionId = stringFrom(payload?.sessionId);
+      if (sessionId !== undefined) void syncSessionTranscript(sessionId);
+    }
   }
 
   function handleOutputEvent(event: BrowserAppEvent) {
@@ -142,6 +146,10 @@
     const result = await sendCommand("/api/agent/start", prompt === undefined ? {} : { prompt });
     if (result === undefined) return undefined;
     activeSessionId = result.sessionId;
+    status = "running";
+    message = defaultMessage("running");
+    output = [];
+    expandedToolOutputKeys = [];
     commandMessage = result.message;
     void loadSessionSummaries();
     return result;
@@ -154,6 +162,7 @@
     status = "running";
     message = "Agent session is running.";
     output = result.transcript.map(outputFromTranscript);
+    expandedToolOutputKeys = [];
     commandMessage = result.message;
     closeMobileSessionSheet();
     panelElement?.dispatchEvent(new CustomEvent("agent-session-selected", { bubbles: true }));
@@ -164,6 +173,8 @@
     if (input.length === 0) return;
     const sessionId = activeSessionId ?? (await startSession())?.sessionId;
     if (sessionId === undefined) return;
+    status = "running";
+    message = defaultMessage("running");
     output = [...output, { key: `user-${crypto.randomUUID()}`, role: "user", kind: "user", text: input }];
     const result = await sendCommand("/api/agent/input", { sessionId, input });
     if (result === undefined) return;
@@ -245,6 +256,13 @@
     } finally {
       commandBusy = false;
     }
+  }
+
+  async function syncSessionTranscript(sessionId: string) {
+    const result = await sendCommand("/api/agent/resume", { sessionId });
+    if (result === undefined || activeSessionId !== sessionId) return;
+    output = result.transcript.map(outputFromTranscript);
+    expandedToolOutputKeys = [];
   }
 
   function reportCommandFailure(text: string): undefined {
