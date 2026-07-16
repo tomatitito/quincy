@@ -6,10 +6,12 @@ import { readFileSync } from "node:fs";
 const source = readFileSync("src/lib/components/AgentPanel.svelte", "utf8");
 
 describe("AgentPanel session selection", () => {
-  test("renders session rows as accessible controls with active state", () => {
+  test("renders persisted session rows as accessible controls with active state", () => {
+    expect(source).toContain('const response = await fetch("/api/agent/sessions")');
     expect(source).toContain('<button type="button" class="agent-session-row"');
     expect(source).toContain('class:active={session.id === activeSessionId}');
     expect(source).toContain('aria-current={session.id === activeSessionId ? "true" : undefined}');
+    expect(source).toContain('onclick={() => resumeSession(session.id)}');
     expect(source).toContain('<span class="session-label">{session.label}</span>');
   });
 

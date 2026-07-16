@@ -2,6 +2,7 @@ import type { AgentSessionSummary, AgentSessionSummaryRepository } from "$lib/do
 
 interface PiSessionSummaryRepositoryDependencies {
   cwd: string;
+  loadSdk?: () => Promise<PiSessionSummarySdk>;
 }
 
 interface PiSessionInfo {
@@ -11,19 +12,30 @@ interface PiSessionInfo {
   firstMessage: string;
 }
 
+interface PiSessionSummarySdk {
+  SessionManager: { list: (cwd: string) => Promise<PiSessionInfo[]> };
+}
+
 export function createPiSessionSummaryRepository(dependencies: PiSessionSummaryRepositoryDependencies): AgentSessionSummaryRepository {
-  return () => listSessionSummaries(dependencies.cwd);
+  return () => listSessionSummaries(dependencies);
 }
 
-async function listSessionSummaries(cwd: string): Promise<AgentSessionSummary[]> {
-  const { SessionManager } = await loadPiSdk();
-  const sessions = await SessionManager.list(cwd);
-  return sessions.map(toSessionSummary).sort(byLastUsedDesc);
+async function listSessionSummaries(dependencies: PiSessionSummaryRepositoryDependencies): Promise<AgentSessionSummary[]> {
+  const { SessionManager } = await loadPiSdk(dependencies);
+  const sessions = await SessionManager.list(dependencies.cwd);
+  return uniqueSessions(sessions).map(toSessionSummary).sort(byLastUsedDesc);
 }
 
-async function loadPiSdk() {
+async function loadPiSdk(dependencies: PiSessionSummaryRepositoryDependencies) {
+  if (dependencies.loadSdk !== undefined) return dependencies.loadSdk();
   const packageName = "@earendil-works/pi-coding-" + "agent";
-  return import(/* @vite-ignore */ packageName) as Promise<{ SessionManager: { list: (cwd: string) => Promise<PiSessionInfo[]> } }>;
+  return import(/* @vite-ignore */ packageName) as Promise<PiSessionSummarySdk>;
+}
+
+function uniqueSessions(sessions: PiSessionInfo[]): PiSessionInfo[] {
+  const byId = new Map<string, PiSessionInfo>();
+  for (const session of sessions) if (!byId.has(session.id)) byId.set(session.id, session);
+  return [...byId.values()];
 }
 
 function toSessionSummary(session: PiSessionInfo): AgentSessionSummary {

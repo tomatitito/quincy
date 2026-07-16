@@ -1,5 +1,6 @@
 /// <reference types="bun" />
 
+import path from "node:path";
 import { describe, expect, test } from "bun:test";
 import { createPiRuntimeRepository } from "$lib/infrastructure/outbound/piRuntimeRepository";
 import type { AppEventPublisher } from "$lib/infrastructure/outbound/appEventHub";
@@ -18,6 +19,16 @@ const createScenario = () => {
 };
 
 describe("createPiRuntimeRepository", () => {
+  test("starts session with persisted Pi session id", async () => {
+    const scenario = createScenario();
+
+    const result = await scenario.repository.start({ prompt: "begin" });
+
+    expect(result.sessionId).toBe("created-session");
+    expect(scenario.calls).toContain("create:/repo");
+    expect(scenario.session.prompts).toEqual(["begin"]);
+  });
+
   test("resumes an existing persisted session and returns transcript", async () => {
     const scenario = createScenario();
 
@@ -79,7 +90,8 @@ function createSdk(calls: string[], session: ReturnType<typeof createSession>): 
   return {
     getAgentDir: () => "/agent",
     createAgentSessionServices: async (options: { resourceLoaderOptions?: { additionalExtensionPaths?: string[] } }) => {
-      calls.push(options.resourceLoaderOptions?.additionalExtensionPaths?.includes("/Users/dusty/devel/quincy/pi/extensions/delegation/index.ts") === true ? "services:delegation-extension" : "services:no-extension");
+      const extensionPath = path.resolve(process.cwd(), "pi/extensions/delegation/index.ts");
+      calls.push(options.resourceLoaderOptions?.additionalExtensionPaths?.includes(extensionPath) === true ? "services:delegation-extension" : "services:no-extension");
       return { diagnostics: [] };
     },
     createAgentSessionFromServices: async () => ({ session }),
@@ -91,7 +103,7 @@ function createSdk(calls: string[], session: ReturnType<typeof createSession>): 
     SessionManager: {
       create: (cwd: string) => {
         calls.push(`create:${cwd}`);
-        return `created:${cwd}`;
+        return { getSessionId: () => "created-session", toString: () => `created:${cwd}` };
       },
       open: (path: string) => {
         calls.push(`open:${path}`);

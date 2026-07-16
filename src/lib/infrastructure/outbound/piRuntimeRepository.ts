@@ -30,6 +30,8 @@ interface PiSessionInfo {
   path: string;
 }
 
+type PiSessionManager = { getSessionId?: () => string };
+
 interface PiSdk {
   createAgentSessionRuntime: (factory: PiRuntimeFactory, options: { cwd: string; agentDir: string; sessionManager: unknown }) => Promise<PiAgentSessionRuntime>;
   createAgentSessionFromServices: (options: { services: PiServices; sessionManager: unknown; sessionStartEvent?: unknown }) => Promise<{ session: PiAgentSession }>;
@@ -66,8 +68,23 @@ export function createPiRuntimeRepository(dependencies: PiRuntimeRepositoryDepen
 }
 
 async function startSession(dependencies: PiRuntimeRepositoryDependencies, registerSession: SessionRegistrar, prompt: string | undefined): Promise<AgentCommandResult> {
+  try {
+    const sdk = await loadPiSdk(dependencies);
+    const sessionManager = createSessionManager(sdk, dependencies.cwd);
+    const sessionId = sessionManager.getSessionId?.() ?? dependencies.createSessionId();
+    return activateSession(dependencies, registerSession, sessionId, prompt, () => sessionManager, "Agent start command accepted.", "Agent session failed to start.", sdk);
+  } catch (error) {
+    return failedStart(dependencies, error);
+  }
+}
+
+function createSessionManager(sdk: PiSdk, cwd: string): PiSessionManager {
+  return sdk.SessionManager.create(cwd) as PiSessionManager;
+}
+
+function failedStart(dependencies: PiRuntimeRepositoryDependencies, error: unknown): AgentCommandResult {
   const sessionId = dependencies.createSessionId();
-  return activateSession(dependencies, registerSession, sessionId, prompt, (sdk) => sdk.SessionManager.create(dependencies.cwd), "Agent start command accepted.", "Agent session failed to start.");
+  return { accepted: false, sessionId, message: errorMessage(error, "Agent session failed to start.") };
 }
 
 async function resumeSession(dependencies: PiRuntimeRepositoryDependencies, registerSession: SessionRegistrar, sessionId: AgentSessionId): Promise<AgentCommandResult> {
