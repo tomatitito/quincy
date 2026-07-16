@@ -5,18 +5,24 @@ export type GraphDirection = "lr" | "tb";
 
 export interface ResponsiveWorkspaceState {
   agentOverlayOpen: boolean;
+  terminalOverlayOpen: boolean;
   graphDirection: GraphDirection;
   visibleTab: WorkspaceTab;
 }
 
 export function responsiveWorkspaceState(mode: ViewportMode, activeTab: WorkspaceTab, lastWorkspaceTab: WorkspacePane): ResponsiveWorkspaceState {
-  const agentOverlayOpen = mode === "mobile" && activeTab === "agent";
-
+  const agentOverlayOpen = mobileOverlayOpen(mode, activeTab, "agent");
+  const terminalOverlayOpen = mobileOverlayOpen(mode, activeTab, "terminal");
   return {
     agentOverlayOpen,
+    terminalOverlayOpen,
     graphDirection: mode === "mobile" ? "tb" : "lr",
-    visibleTab: agentOverlayOpen ? lastWorkspaceTab : activeTab,
+    visibleTab: agentOverlayOpen || terminalOverlayOpen ? lastWorkspaceTab : activeTab,
   };
+}
+
+function mobileOverlayOpen(mode: ViewportMode, activeTab: WorkspaceTab, tab: WorkspaceTab): boolean {
+  return mode === "mobile" && activeTab === tab;
 }
 
 export function nextLastWorkspaceTab(currentTab: WorkspacePane, activeTab: WorkspaceTab): WorkspacePane {

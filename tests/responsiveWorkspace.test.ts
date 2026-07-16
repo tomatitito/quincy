@@ -15,11 +15,13 @@ describe("responsive workspace behavior", () => {
   test("keeps desktop and tablet navigation as normal tabs", () => {
     expect(responsiveWorkspaceState("desktop", "agent", "kanban")).toEqual({
       agentOverlayOpen: false,
+      terminalOverlayOpen: false,
       graphDirection: "lr",
       visibleTab: "agent",
     });
     expect(responsiveWorkspaceState("tablet", "graph", "details")).toEqual({
       agentOverlayOpen: false,
+      terminalOverlayOpen: false,
       graphDirection: "lr",
       visibleTab: "graph",
     });
@@ -37,8 +39,19 @@ describe("responsive workspace behavior", () => {
     expect(nextLastWorkspaceTab("kanban", "agent")).toBe("kanban");
     expect(responsiveWorkspaceState("mobile", "agent", "kanban")).toEqual({
       agentOverlayOpen: true,
+      terminalOverlayOpen: false,
       graphDirection: "tb",
       visibleTab: "kanban",
+    });
+  });
+
+  test("shows terminal as a mobile overlay over the last workspace tab", () => {
+    expect(nextLastWorkspaceTab("kanban", "terminal")).toBe("kanban");
+    expect(responsiveWorkspaceState("mobile", "terminal", "details")).toEqual({
+      agentOverlayOpen: false,
+      terminalOverlayOpen: true,
+      graphDirection: "tb",
+      visibleTab: "details",
     });
   });
 });

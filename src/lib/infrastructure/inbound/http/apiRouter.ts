@@ -1,3 +1,4 @@
+/* eslint-disable sensors/max-file-lines */
 import { randomUUID } from "node:crypto";
 import { getAgentSessionSummaries } from "$lib/application/getAgentSessionSummaries";
 import { resumeAgentSession } from "$lib/application/resumeAgentSession";
@@ -10,6 +11,7 @@ import { createConfigProvider } from "$lib/infrastructure/outbound/config";
 import { createPiRuntimeRepository } from "$lib/infrastructure/outbound/piRuntimeRepository";
 import { createPiSessionSummaryRepository } from "$lib/infrastructure/outbound/piSessionSummaryRepository";
 import { createProjectFileRepository } from "$lib/infrastructure/outbound/projectFileRepository";
+import { createTerminalRepository, type TerminalRepository } from "$lib/infrastructure/outbound/terminalRepository";
 import { publishAppEvent } from "$lib/infrastructure/outbound/appEventHub";
 import { createTicketFileRepository } from "$lib/infrastructure/outbound/ticketFileRepository";
 import { createSelectedProjectCookie, readSelectedProjectFromRequest } from "$lib/infrastructure/inbound/http/projectSelectionCookie";
@@ -19,6 +21,7 @@ interface ProjectRepositories {
   agentRepository: AgentRepository;
   agentSessionSummaryRepository: AgentSessionSummaryRepository;
   projectFileRepository: ProjectFileRepository;
+  terminalRepository: TerminalRepository;
 }
 
 const configProvider = createConfigProvider();
@@ -35,15 +38,30 @@ async function handleGetRequest(request: Request, path: string): Promise<Respons
   if (path.endsWith("/kanban")) return Response.json(await loadKanban(request));
   if (path.endsWith("/agent/sessions")) return Response.json(await loadAgentSessions(request));
   if (path.endsWith("/project-files")) return Response.json(await loadProjectFileSuggestions(request));
+  if (path.endsWith("/terminal/state")) return Response.json(await loadTerminalState(request));
   return notFoundResponse();
 }
 
 async function handlePostRequest(request: Request, path: string): Promise<Response> {
   if (path.endsWith("/projects/select")) return handleProjectSelect(request);
+  if (path.includes("/agent/")) return handleAgentPostRequest(request, path);
+  if (path.includes("/terminal/")) return handleTerminalPostRequest(request, path);
+  return notFoundResponse();
+}
+
+async function handleAgentPostRequest(request: Request, path: string): Promise<Response> {
   if (path.endsWith("/agent/start")) return Response.json(await handleAgentStart(request));
   if (path.endsWith("/agent/resume")) return Response.json(await handleAgentResume(request));
   if (path.endsWith("/agent/stop")) return Response.json(await handleAgentStop(request));
   if (path.endsWith("/agent/input")) return Response.json(await handleAgentInput(request));
+  return notFoundResponse();
+}
+
+async function handleTerminalPostRequest(request: Request, path: string): Promise<Response> {
+  if (path.endsWith("/terminal/open")) return Response.json(await handleTerminalOpen(request));
+  if (path.endsWith("/terminal/input")) return Response.json(await handleTerminalInput(request));
+  if (path.endsWith("/terminal/resize")) return Response.json(await handleTerminalResize(request));
+  if (path.endsWith("/terminal/close")) return Response.json(await handleTerminalClose(request));
   return notFoundResponse();
 }
 
@@ -66,14 +84,28 @@ async function loadProjectFileSuggestions(request: Request) {
   return getProjectFileSuggestions(projectFileRepository, { query: new URL(request.url).searchParams.get("query") ?? "" });
 }
 
+async function loadTerminalState(request: Request) {
+  const url = new URL(request.url);
+  const sessionId = url.searchParams.get("sessionId") ?? "";
+  const terminalRepository = await loadTerminalRepository(request, optionalString(url.searchParams.get("projectPath")));
+  return terminalRepository.state(sessionId) ?? { status: "closed", message: "Terminal session not found." };
+}
+
 async function handleProjectSelect(request: Request) {
+  const previousProjectPath = readSelectedProjectFromRequest(request);
   const body = await readJsonRecord(request);
   const projectPath = requiredString(body.projectPath, "projectPath");
   const config = await configProvider({ selectedProjectPath: projectPath });
-  return Response.json(
-    { projectPath: config.projectPath, ticketDirectory: config.ticketDirectory },
-    { headers: { "set-cookie": createSelectedProjectCookie(config.projectPath) } },
-  );
+  closePreviousProjectTerminal(previousProjectPath, config.projectPath);
+  return projectSelectionResponse(config.projectPath, config.ticketDirectory);
+}
+
+function projectSelectionResponse(projectPath: ProjectPath, ticketDirectory: string) {
+  return Response.json({ projectPath, ticketDirectory }, { headers: { "set-cookie": createSelectedProjectCookie(projectPath) } });
+}
+
+function closePreviousProjectTerminal(previousProjectPath: ProjectPath | undefined, nextProjectPath: ProjectPath) {
+  if (previousProjectPath !== undefined && previousProjectPath !== nextProjectPath) projectRepositories.get(previousProjectPath)?.terminalRepository.closeAll();
 }
 
 async function handleAgentStart(request: Request) {
@@ -104,9 +136,41 @@ async function handleAgentInput(request: Request) {
   return sendAgentInput(agentRepository, { sessionId, input });
 }
 
+async function handleTerminalOpen(request: Request) {
+  const { terminalRepository } = await loadProjectRepositories(request);
+  return terminalRepository.open();
+}
+
+async function handleTerminalInput(request: Request) {
+  const body = await readJsonRecord(request);
+  const sessionId = requiredString(body.sessionId, "sessionId");
+  const input = requiredString(body.input, "input");
+  const terminalRepository = await loadTerminalRepository(request, optionalString(body.projectPath));
+  return terminalRepository.input(sessionId, input) ?? { status: "closed", message: "Terminal session not found." };
+}
+
+async function handleTerminalResize(request: Request) {
+  const body = await readJsonRecord(request);
+  const sessionId = requiredString(body.sessionId, "sessionId");
+  const terminalRepository = await loadTerminalRepository(request, optionalString(body.projectPath));
+  return terminalRepository.resize(sessionId, requiredNumber(body.cols, "cols"), requiredNumber(body.rows, "rows")) ?? { status: "closed", message: "Terminal session not found." };
+}
+
+async function handleTerminalClose(request: Request) {
+  const body = await readJsonRecord(request);
+  const sessionId = requiredString(body.sessionId, "sessionId");
+  const terminalRepository = await loadTerminalRepository(request, optionalString(body.projectPath));
+  return terminalRepository.close(sessionId) ?? { status: "closed", message: "Terminal session not found." };
+}
+
 async function loadProjectRepositories(request: Request): Promise<ProjectRepositories> {
   const config = await loadConfig(request);
   return repositoriesForProject(config.projectPath);
+}
+
+async function loadTerminalRepository(request: Request, projectPath: string | undefined): Promise<TerminalRepository> {
+  if (projectPath === undefined) return (await loadProjectRepositories(request)).terminalRepository;
+  return repositoriesForProject(projectPath).terminalRepository;
 }
 
 async function loadConfig(request: Request) {
@@ -126,6 +190,7 @@ function createProjectRepositories(projectPath: ProjectPath): ProjectRepositorie
     agentRepository: createPiRuntimeRepository({ createSessionId: randomUUID, cwd: projectPath, publishEvent: publishAppEvent }),
     agentSessionSummaryRepository: createPiSessionSummaryRepository({ cwd: projectPath }),
     projectFileRepository: createProjectFileRepository(projectPath),
+    terminalRepository: createTerminalRepository({ cwd: projectPath, createSessionId: randomUUID }),
   };
 }
 
@@ -143,3 +208,23 @@ function requiredString(value: unknown, name: string) {
   if (typeof value === "string" && value.length > 0) return value;
   throw new Response(`Missing ${name}`, { status: 400 });
 }
+
+function requiredNumber(value: unknown, name: string) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  throw new Response(`Missing ${name}`, { status: 400 });
+}
+
+export function closeTerminalRepositories() {
+  for (const repositories of projectRepositories.values()) repositories.terminalRepository.closeAll();
+}
+
+let shutdownHandlersRegistered = false;
+
+export function registerTerminalRepositoryShutdownHandlers() {
+  if (shutdownHandlersRegistered || typeof process === "undefined") return;
+  shutdownHandlersRegistered = true;
+  process.once("beforeExit", closeTerminalRepositories);
+  process.once("exit", closeTerminalRepositories);
+}
+
+registerTerminalRepositoryShutdownHandlers();

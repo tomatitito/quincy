@@ -4,6 +4,7 @@
   import GraphView from "$lib/components/GraphView.svelte";
   import KanbanBoard from "$lib/components/KanbanBoard.svelte";
   import TicketDetails from "$lib/components/TicketDetails.svelte";
+  import TerminalPanel from "$lib/components/TerminalPanel.svelte";
   import RepoChangeGraphView from "$lib/experiments/repoChangeGraph/RepoChangeGraphView.svelte";
   import type { RepoChangeGraphView as RepoChangeGraphViewData } from "$lib/experiments/repoChangeGraph/repoChangeGraph";
   import type { GraphView as GraphViewData } from "$lib/application/getGraphView";
@@ -44,6 +45,7 @@
   const readyCount = $derived(tickets.filter((ticket) => ticket.ready).length);
   const workspaceState = $derived(responsiveWorkspaceState($viewportMode, activeTab, lastWorkspaceTab));
   const agentOverlayOpen = $derived(workspaceState.agentOverlayOpen);
+  const terminalOverlayOpen = $derived(workspaceState.terminalOverlayOpen);
   const visibleTab = $derived(workspaceState.visibleTab);
   const graphDirection = $derived(workspaceState.graphDirection);
   const selectedTicket = $derived(tickets.find((ticket) => ticket.id === selectedTicketId));
@@ -56,7 +58,7 @@
     onTabChange(tab);
   }
 
-  function closeAgentOverlay() {
+  function closeOverlay() {
     onTabChange(lastWorkspaceTab);
   }
 
@@ -83,11 +85,12 @@
 
   <section class="tabs" aria-label="Workspace summary">
     <nav class="tabs-nav" aria-label="Views">
-      <button type="button" class:active={!agentOverlayOpen && visibleTab === "graph"} onclick={() => selectTab("graph")}>Graph</button>
-      <button type="button" class:active={!agentOverlayOpen && visibleTab === "changes"} onclick={() => selectTab("changes")}>Changes</button>
-      <button type="button" class:active={!agentOverlayOpen && visibleTab === "kanban"} onclick={() => selectTab("kanban")}>Kanban</button>
-      <button type="button" class:active={!agentOverlayOpen && visibleTab === "details"} onclick={() => selectTab("details")}>Details</button>
+      <button type="button" class:active={!agentOverlayOpen && !terminalOverlayOpen && visibleTab === "graph"} onclick={() => selectTab("graph")}>Graph</button>
+      <button type="button" class:active={!agentOverlayOpen && !terminalOverlayOpen && visibleTab === "changes"} onclick={() => selectTab("changes")}>Changes</button>
+      <button type="button" class:active={!agentOverlayOpen && !terminalOverlayOpen && visibleTab === "kanban"} onclick={() => selectTab("kanban")}>Kanban</button>
+      <button type="button" class:active={!agentOverlayOpen && !terminalOverlayOpen && visibleTab === "details"} onclick={() => selectTab("details")}>Details</button>
       <button type="button" class:active={agentOverlayOpen || activeTab === "agent"} onclick={() => selectTab("agent")}>Agent</button>
+      <button type="button" class:active={terminalOverlayOpen || activeTab === "terminal"} onclick={() => selectTab("terminal")}>Terminal</button>
     </nav>
     <div class="stats-row">
       <span>Total: {tickets.length}</span>
@@ -111,8 +114,10 @@
         <KanbanBoard columns={data.kanban.columns} {selectedTicketId} onTicketSelect={selectTicket} />
       {:else if visibleTab === "details"}
         <TicketDetails ticket={selectedTicket} onAgentStart={startAgentForTicket} />
-      {:else}
+      {:else if visibleTab === "agent"}
         <AgentPanel {appEvents} projectPath={data.projectPath} startRequest={agentStartRequest} onStartRequestHandled={clearAgentStartRequest} />
+      {:else}
+        <TerminalPanel projectPath={data.projectPath} />
       {/if}
     </main>
   {:else if $viewportMode === "tablet"}
@@ -125,8 +130,10 @@
         <KanbanBoard columns={data.kanban.columns} {selectedTicketId} onTicketSelect={selectTicket} />
       {:else if visibleTab === "details"}
         <TicketDetails ticket={selectedTicket} onAgentStart={startAgentForTicket} />
-      {:else}
+      {:else if visibleTab === "agent"}
         <AgentPanel {appEvents} projectPath={data.projectPath} startRequest={agentStartRequest} onStartRequestHandled={clearAgentStartRequest} />
+      {:else}
+        <TerminalPanel projectPath={data.projectPath} />
       {/if}
     </main>
   {:else}
@@ -142,14 +149,18 @@
       {/if}
     </main>
 
-    {#if agentOverlayOpen}
-      <section class="mobile-agent-overlay" aria-label="Agent overlay">
+    {#if agentOverlayOpen || terminalOverlayOpen}
+      <section class="mobile-agent-overlay" aria-label={agentOverlayOpen ? "Agent overlay" : "Terminal overlay"}>
         <header class="mobile-agent-overlay-header">
-          <button type="button" onclick={closeAgentOverlay} aria-label="Back to workspace">Back</button>
-          <h2>Agent</h2>
+          <button type="button" onclick={closeOverlay} aria-label="Back to workspace">Back</button>
+          <h2>{agentOverlayOpen ? "Agent" : "Terminal"}</h2>
         </header>
         <div class="mobile-agent-overlay-body">
-          <AgentPanel {appEvents} projectPath={data.projectPath} startRequest={agentStartRequest} onStartRequestHandled={clearAgentStartRequest} />
+          {#if agentOverlayOpen}
+            <AgentPanel {appEvents} projectPath={data.projectPath} startRequest={agentStartRequest} onStartRequestHandled={clearAgentStartRequest} />
+          {:else}
+            <TerminalPanel projectPath={data.projectPath} />
+          {/if}
         </div>
       </section>
     {/if}
