@@ -29,6 +29,6 @@ export function nextLastWorkspaceTab(currentTab: WorkspacePane, activeTab: Works
   return isWorkspacePane(activeTab) ? activeTab : currentTab;
 }
 
-export function tabAfterTicketSelection(mode: ViewportMode, currentTab: WorkspaceTab): WorkspaceTab {
-  return mode === "mobile" ? "details" : currentTab;
+export function tabAfterTicketSelection(_mode: ViewportMode, _currentTab: WorkspaceTab): WorkspaceTab {
+  return "details";
 }

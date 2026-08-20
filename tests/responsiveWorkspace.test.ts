@@ -31,7 +31,8 @@ describe("responsive workspace behavior", () => {
     expect(responsiveWorkspaceState("mobile", "graph", "graph").graphDirection).toBe("tb");
     expect(tabAfterTicketSelection("mobile", "graph")).toBe("details");
     expect(tabAfterTicketSelection("mobile", "kanban")).toBe("details");
-    expect(tabAfterTicketSelection("desktop", "kanban")).toBe("kanban");
+    expect(tabAfterTicketSelection("tablet", "graph")).toBe("details");
+    expect(tabAfterTicketSelection("desktop", "kanban")).toBe("details");
   });
 
   test("shows agent as a mobile overlay over the last workspace tab", () => {

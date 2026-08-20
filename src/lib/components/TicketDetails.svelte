@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from "svelte";
   import hljs from "highlight.js";
   import "highlight.js/styles/github-dark.css";
   import { marked, type Tokens } from "marked";
@@ -10,6 +11,7 @@
   }
 
   let { ticket, onAgentStart }: Props = $props();
+  let detailsElement = $state<HTMLElement>();
   let htmlEnabled = $state(false);
   let previousTicketId = $state<string | undefined>();
 
@@ -17,7 +19,13 @@
     if (ticket?.id === previousTicketId) return;
     previousTicketId = ticket?.id;
     htmlEnabled = false;
+    void focusDetails();
   });
+
+  async function focusDetails() {
+    await tick();
+    detailsElement?.focus();
+  }
 
   let renderedDescription = $derived(ticket?.description ? renderMarkdown(ticket.description, htmlEnabled) : "");
 
@@ -45,7 +53,7 @@
 </script>
 
 {#if ticket}
-  <article class="ticket-details" aria-label="Ticket details">
+  <article bind:this={detailsElement} class="ticket-details" aria-label="Ticket details" tabindex="-1">
     <header>
       <div>
         <strong>{ticket.id}</strong>
