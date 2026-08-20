@@ -89,8 +89,8 @@
       <button type="button" class:active={!agentOverlayOpen && !terminalOverlayOpen && visibleTab === "changes"} onclick={() => selectTab("changes")}>Changes</button>
       <button type="button" class:active={!agentOverlayOpen && !terminalOverlayOpen && visibleTab === "kanban"} onclick={() => selectTab("kanban")}>Kanban</button>
       <button type="button" class:active={!agentOverlayOpen && !terminalOverlayOpen && visibleTab === "details"} onclick={() => selectTab("details")}>Details</button>
+      <button type="button" class:active={terminalOverlayOpen || activeTab === "terminal"} onclick={() => selectTab("terminal")} aria-label="Terminal — preferred agent workflow">Terminal</button>
       <button type="button" class:active={agentOverlayOpen || activeTab === "agent"} onclick={() => selectTab("agent")}>Agent</button>
-      <button type="button" class:active={terminalOverlayOpen || activeTab === "terminal"} onclick={() => selectTab("terminal")}>Terminal</button>
     </nav>
     <div class="stats-row">
       <span>Total: {tickets.length}</span>

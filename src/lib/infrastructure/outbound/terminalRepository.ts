@@ -47,7 +47,7 @@ type PtySubscription = { dispose(): void };
 
 interface TerminalSession {
   state: TerminalState;
-  process: PtyProcess;
+  process?: PtyProcess;
   disposables: Disposable[];
 }
 
@@ -67,12 +67,12 @@ export function createTerminalRepository(dependencies: TerminalRepositoryDepende
     },
     state: (sessionId) => (session?.state.sessionId === sessionId ? copyState(session.state) : undefined),
     input: (sessionId, input) => {
-      if (session?.state.sessionId !== sessionId || session.state.status !== "open") return undefined;
+      if (session?.state.sessionId !== sessionId || session.state.status !== "open" || session.process === undefined) return undefined;
       session.process.write(input);
       return copyState(session.state);
     },
     resize: (sessionId, cols, rows) => {
-      if (session?.state.sessionId !== sessionId || session.state.status === "closed") return undefined;
+      if (session?.state.sessionId !== sessionId || session.state.status !== "open" || session.process === undefined) return undefined;
       session.state.cols = normalizeDimension(cols, DEFAULT_COLS);
       session.state.rows = normalizeDimension(rows, DEFAULT_ROWS);
       session.process.resize(session.state.cols, session.state.rows);
@@ -92,21 +92,36 @@ export function createTerminalRepository(dependencies: TerminalRepositoryDepende
 function startSession(dependencies: TerminalRepositoryDependencies): TerminalSession {
   const shell = dependencies.shell ?? process.env.SHELL ?? "/bin/sh";
   const initialState = createInitialState(dependencies);
-  const ptyProcess = (dependencies.spawnPty ?? pty.spawn)(shell, [], ptyOptions(dependencies.cwd, initialState));
-  return bindProcessEvents({ state: initialState, process: ptyProcess, disposables: [] });
+  try {
+    const ptyProcess = (dependencies.spawnPty ?? pty.spawn)(shell, [], ptyOptions(dependencies.cwd, initialState));
+    return bindProcessEvents({ state: initialState, process: ptyProcess, disposables: [] }, ptyProcess);
+  } catch (error) {
+    return failedSession(initialState, error);
+  }
 }
 
 function createInitialState(dependencies: TerminalRepositoryDependencies): TerminalState {
   return { sessionId: dependencies.createSessionId(), projectPath: dependencies.cwd, status: "open", output: "", message: `Terminal running in ${dependencies.cwd}`, cols: DEFAULT_COLS, rows: DEFAULT_ROWS };
 }
 
+function failedSession(state: TerminalState, error: unknown): TerminalSession {
+  const message = error instanceof Error ? error.message : "Unknown terminal error.";
+  return {
+    state: { ...state, status: "error", message: `Terminal failed to open: ${message}` },
+    disposables: [],
+  };
+}
+
 function ptyOptions(cwd: ProjectPath, state: TerminalState): pty.IPtyForkOptions {
   return { cwd, env: { ...process.env, TERM: "xterm-256color" }, cols: state.cols, rows: state.rows, name: "xterm-256color" };
 }
 
-function bindProcessEvents(session: TerminalSession): TerminalSession {
-  const dataSubscription = session.process.onData((chunk) => appendOutput(session.state, chunk));
-  const exitSubscription = session.process.onExit((event) => markClosed(session.state, exitMessage(event)));
+function bindProcessEvents(session: TerminalSession, process: PtyProcess): TerminalSession {
+  const dataSubscription = process.onData((chunk) => appendOutput(session.state, chunk));
+  const exitSubscription = process.onExit((event) => {
+    markClosed(session.state, exitMessage(event));
+    disposeSessionSubscriptions(session);
+  });
   session.disposables.push(() => dataSubscription.dispose(), () => exitSubscription.dispose());
   return session;
 }
@@ -124,9 +139,15 @@ function markClosed(state: TerminalState, message: string): TerminalState {
 
 function closeSession(session: TerminalSession, message: string): TerminalSession {
   if (session.state.status === "closed") return session;
-  for (const disposable of session.disposables) disposable();
-  session.process.kill();
+  disposeSessionSubscriptions(session);
+  session.process?.kill();
   markClosed(session.state, message);
+  return session;
+}
+
+function disposeSessionSubscriptions(session: TerminalSession): TerminalSession {
+  for (const disposable of session.disposables) disposable();
+  session.disposables = [];
   return session;
 }
 

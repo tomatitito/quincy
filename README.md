@@ -1,6 +1,6 @@
 # Quincy
 
-Quincy is a local web UI for browsing and working with projects that use markdown tickets. It provides ticket, Kanban, graph, and agent views.
+Quincy is a local web UI for browsing and working with projects that use markdown tickets. It provides ticket, Kanban, graph, terminal, and agent views.
 
 ## Requirements
 
@@ -53,6 +53,18 @@ QUINCY_TICKET_DIRECTORY=.tickets \
 ```
 
 Configure multiple projects to select them from Quincy header. See [configuration documentation](docs/configuration.md) for config file locations, schema, and runtime overrides.
+
+## Work with Pi in the terminal
+
+The Terminal view is Quincy's preferred agent workflow. It opens an interactive PTY in the active project root; run Pi's native CLI/TUI there:
+
+```sh
+bunx --bun pi
+```
+
+Pi is installed with Quincy's dependencies; `bunx` resolves that local CLI without requiring a global installation. Authenticate with `/login` on first use, then ask Pi to edit files and run the project's tests directly in its native interface.
+
+Changing projects closes the previous project's terminal and opens a new one in the selected project root. Terminal input and output stay on the PTY transport: Quincy does not parse terminal output or route it through Agent APIs. The Agent view remains available as a fallback during this migration stage.
 
 ## Validation
 

@@ -31,6 +31,7 @@
   let resizeObserver: ResizeObserver | undefined;
   let mounted = false;
   let latestOutput = "";
+  let inputQueue = Promise.resolve();
 
   $effect(() => {
     if (!mounted) return;
@@ -57,7 +58,7 @@
     resizeObserver?.disconnect();
     inputDisposable?.dispose();
     terminal?.dispose();
-    void closeCurrentTerminal();
+    inputQueue = inputQueue.then(closeCurrentTerminal);
   });
 
   async function bootTerminal() {
@@ -72,10 +73,13 @@
     fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
     terminal.open(terminalElement);
-    inputDisposable = terminal.onData((input) => void sendInput(input));
+    inputDisposable = terminal.onData((input) => {
+      inputQueue = inputQueue.then(() => sendInput(input));
+    });
   }
 
   async function switchProject(nextProjectPath: string) {
+    await inputQueue;
     await closeCurrentTerminal();
     activeProjectPath = nextProjectPath;
     sessionId = undefined;
@@ -87,15 +91,23 @@
   }
 
   async function openTerminal() {
+    status = "opening";
+    message = "Opening terminal…";
     const state = await sendCommand("/api/terminal/open", {});
     applyState(state);
+    if (state.status !== "open") return;
     await resizeTerminal();
+    terminal?.focus();
   }
 
   async function refreshState() {
     if (sessionId === undefined) return;
-    const response = await fetch(`/api/terminal/state?sessionId=${encodeURIComponent(sessionId)}&projectPath=${encodeURIComponent(activeProjectPath ?? projectPath)}`);
-    applyState(await parseStateResponse(response));
+    try {
+      const response = await fetch(`/api/terminal/state?sessionId=${encodeURIComponent(sessionId)}&projectPath=${encodeURIComponent(activeProjectPath ?? projectPath)}`);
+      applyState(await parseStateResponse(response));
+    } catch {
+      applyState(transportErrorState());
+    }
   }
 
   async function resizeTerminal() {
@@ -115,14 +127,26 @@
   }
 
   async function sendCommand(url: string, body: Record<string, unknown>): Promise<TerminalState> {
-    const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-    return parseStateResponse(response);
+    try {
+      const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      return parseStateResponse(response);
+    } catch {
+      return transportErrorState();
+    }
   }
 
   async function parseStateResponse(response: Response): Promise<TerminalState> {
     if (!response.ok) return { status: "error", message: "Terminal request failed." };
-    const value: unknown = await response.json();
-    return parseTerminalState(value);
+    try {
+      const value: unknown = await response.json();
+      return parseTerminalState(value);
+    } catch {
+      return { status: "error", message: "Terminal response invalid." };
+    }
+  }
+
+  function transportErrorState(): TerminalState {
+    return { status: "error", message: "Terminal connection lost. Reopen to retry." };
   }
 
   function parseTerminalState(value: unknown): TerminalState {
@@ -158,10 +182,14 @@
 <section class="terminal-panel" aria-label="Terminal view">
   <header class="terminal-toolbar">
     <div>
-      <p class="eyebrow">Terminal</p>
+      <p class="eyebrow">Terminal · Preferred agent workflow</p>
       <p class="terminal-message">{message}</p>
     </div>
-    <button type="button" onclick={closeCurrentTerminal} disabled={sessionId === undefined || status === "closed"}>Close</button>
+    {#if status === "closed" || status === "error"}
+      <button type="button" onclick={openTerminal}>Reopen</button>
+    {:else}
+      <button type="button" onclick={closeCurrentTerminal} disabled={sessionId === undefined}>Close</button>
+    {/if}
   </header>
   <div bind:this={terminalElement} class="terminal-screen" aria-label="Interactive project terminal"></div>
 </section>

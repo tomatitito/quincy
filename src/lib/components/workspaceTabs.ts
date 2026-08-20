@@ -1,7 +1,7 @@
 export const workspacePanes = ["graph", "changes", "kanban", "details"] as const;
 export const agentTab = "agent";
 export const terminalTab = "terminal";
-export const workspaceTabs = [...workspacePanes, agentTab, terminalTab] as const;
+export const workspaceTabs = [...workspacePanes, terminalTab, agentTab] as const;
 
 export type WorkspacePane = (typeof workspacePanes)[number];
 export type WorkspaceTab = (typeof workspaceTabs)[number];

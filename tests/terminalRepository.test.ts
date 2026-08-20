@@ -65,6 +65,36 @@ describe("terminal repository", () => {
     expect(fakePty.killed).toBe(true);
     expect(repository.state("terminal-1")?.output).toBe("");
   });
+
+  test("reports natural PTY exit and disposes process handlers", () => {
+    const fakePty = createFakePty();
+    const repository = createTerminalRepository({ cwd: "/repo/project", createSessionId: () => "terminal-1", spawnPty: () => fakePty });
+    repository.open();
+
+    fakePty.exitHandlers.forEach((handler) => handler({ exitCode: 0 }));
+
+    expect(repository.state("terminal-1")).toMatchObject({ status: "closed", message: "Terminal exited with code 0." });
+    expect(fakePty.dataHandlers).toHaveLength(0);
+    expect(fakePty.exitHandlers).toHaveLength(0);
+  });
+
+  test("reports PTY spawn errors and allows retry", () => {
+    const fakePty = createFakePty();
+    let attempts = 0;
+    const repository = createTerminalRepository({
+      cwd: "/repo/project",
+      createSessionId: () => `terminal-${attempts}`,
+      spawnPty: () => {
+        attempts += 1;
+        if (attempts === 1) throw new Error("shell unavailable");
+        return fakePty;
+      },
+    });
+
+    expect(repository.open()).toMatchObject({ status: "error", message: "Terminal failed to open: shell unavailable" });
+    expect(repository.open()).toMatchObject({ status: "open", projectPath: "/repo/project" });
+    expect(attempts).toBe(2);
+  });
 });
 
 function createFakePty(): FakePty {
