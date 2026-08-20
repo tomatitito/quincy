@@ -11,25 +11,26 @@ tags: [architecture, plugins, agentic, self-extension]
 ---
 # Make Quincy self-extensible through native plugins
 
-Quincy should become self-extensible: an agent running inside Quincy can author, build, install, activate, and reload trusted Quincy plugins without editing or restarting core application code.
+Quincy should become self-extensible: an agent running Pi's CLI/TUI inside Quincy's existing terminal panel can author, build, install, activate, and reload trusted Quincy plugins without editing or restarting core application code.
 
 This is distinct from literal binary self-modification. Agents can already edit Quincy source through Pi tools, and Vite HMR can apply frontend source changes during development. Goal is stable runtime extension mechanism comparable to Pi extensions and bb plugins.
 
-Current architecture already provides useful foundations:
+Current architecture already provides useful migration inputs:
 
 - `src/lib/domain/ports.ts` defines agent-facing ports.
 - `src/lib/infrastructure/outbound/piRuntimeRepository.ts` embeds Pi SDK and owns agent sessions.
 - `src/lib/infrastructure/outbound/agentAppEvents.ts` translates Pi events.
 - `src/lib/infrastructure/outbound/appEventHub.ts` and SSE deliver updates to browser.
+- Quincy's terminal panel can host Pi's native CLI/TUI rather than reproducing its transcript UI.
 - `pi/extensions/delegation/index.ts` proves Pi extension registration works, but extension path is hard-coded.
 - Vite provides frontend HMR under `bun run dev`; production source changes require rebuild/restart.
 
 Two extension levels must remain explicit:
 
 1. Pi extensions extend agent behavior: tools, commands, prompts, lifecycle hooks, and model/session behavior.
-2. Native Quincy plugins extend Quincy application surfaces: Svelte UI, ticket actions, routes, services, storage, background work, and agent contributions.
+2. Native Quincy plugins extend Quincy application surfaces: Svelte UI, ticket actions, routes, services, storage, background work, semantic run/workspace reactions, and commands callable by users or agents.
 
-Implement native Quincy plugin API while reusing Pi extensions for agent-runtime-specific capabilities.
+Implement native Quincy plugin API while reusing Pi extensions for agent-runtime-specific capabilities. Pi's CLI/TUI in the terminal is the preferred agent user interface; Quincy should not maintain a parallel Agent panel or transcript renderer. This replaces the presentation layer, not Quincy's semantic awareness of agent activity.
 
 ## Design
 
@@ -41,8 +42,8 @@ Keep in core:
 
 - process bootstrap, configuration, project selection, and workspace identity
 - markdown ticket model, repository port, ticket actions, Kanban, dependency graph, and ticket details
-- agent session orchestration and semantic lifecycle events
-- Pi runtime adapter behind the existing agent port; Pi-specific behavior remains in Pi extensions
+- runtime-neutral semantic run/workspace events and ticket/run association
+- authenticated local transport used by bundled integrations to publish those semantic events
 - plugin discovery, trust, lifecycle, ownership, disposal, atomic activation, rollback, diagnostics, and recovery controls
 - generic application shell, documented UI slots, namespaced RPC dispatch, and event transport over the existing HTTP/SSE infrastructure
 
@@ -55,7 +56,24 @@ Move optional or volatile capabilities into native plugins:
 
 The ticket workflow stays in core initially because it defines Quincy and its parts co-evolve closely. Reconsider extracting it only if Quincy becomes a generic agent workspace rather than a markdown-ticket workbench.
 
+The custom Agent panel is not a core surface to preserve. The bundled terminal workspace should launch and host Pi's CLI/TUI as the primary interaction surface. Pi continues to own transcript rendering, model and session behavior, commands, prompts, tools, and native lifecycle details. Quincy should delete or retire duplicated Agent-panel presentation only as a separate implementation task; this ticket defines the target plugin platform and does not remove existing code.
+
 `ResponsiveWorkspaceLayout.svelte` and `apiRouter.ts` must stop being feature switchboards. Core registries should render UI contributions and dispatch namespaced backend contributions without hard-coded imports or route branches for each plugin.
+
+## Pi integration boundary
+
+Terminal-first operation does not mean treating Pi as an opaque PTY process. Raw terminal output is sufficient for interaction and transcript presentation, but it is not a stable input for structured native-plugin features such as run-aware LSP impact analysis.
+
+Provide a thin, headless Quincy–Pi bridge, likely as a bundled Pi extension communicating with Quincy over a local authenticated structured channel. The bridge translates selected Pi lifecycle information into runtime-neutral Quincy events such as:
+
+- run started and run settled
+- file mutation starting and completed
+- ticket/run association
+- diagnostics associated with a run or workspace mutation
+
+These are Quincy semantic contracts, not a mirror of Pi's event schema. The bridge owns adaptation across Pi versions; native plugins consume stable Quincy run/workspace hooks and never subscribe to raw Pi events. Keep the channel local, authenticated, and scoped to the active Quincy workspace. Do not add a general remote-agent protocol or duplicate Pi session control unless a demonstrated plugin need requires it.
+
+This boundary also unifies embedded and external Pi usage: any Pi session with the bundled bridge can participate in Quincy semantics while retaining Pi's native UI and behavior. Without the bridge, Pi remains fully usable in the terminal, but structured Quincy features may not know which run or file operation produced a change.
 
 ## Role models
 
@@ -140,7 +158,7 @@ Initial namespaces:
 
 - `api.ui` — panels, ticket-detail tabs/actions, and header actions
 - `api.commands` — user- or agent-invokable application commands
-- `api.agents` — agent tools and semantic run lifecycle hooks
+- `api.runs` — runtime-neutral run lifecycle, ticket association, and diagnostics hooks
 - `api.rpc` — namespaced browser-to-server calls
 - `api.events` — documented publish/subscribe contracts
 - `api.storage` — plugin-owned persistence
@@ -148,6 +166,8 @@ Initial namespaces:
 - `api.workspace` — project identity and documented file-mutation hooks
 
 Server and browser entrypoints receive only namespaces available in their runtime. Core records every contribution and managed resource under plugin ID so disable or reload disposes them together.
+
+Do not introduce a broad `api.agents` namespace. It would couple native plugins to Pi's tools, sessions, or lifecycle vocabulary. `api.runs` and `api.workspace` expose the semantic facts native plugins need independent of the runtime that produced them. `api.commands` remains the bridge for functionality that should be invokable from Quincy UI, Pi, or another authorized caller; Pi-specific tools or commands stay Pi extensions and may call a documented Quincy command rather than becoming native plugin registrations.
 
 Avoid unrestricted `registerRoute(...)`, generic `registerService(...)`, direct filesystem access through host internals, and access to Svelte component instances or private registries. Generic route and service registration would create a service locator and make plugins depend on core structure. Add broader capabilities only from demonstrated plugin needs.
 
@@ -167,8 +187,10 @@ Use explicit Svelte stores/registries rendered by core slot components. Do not l
 ## Reload loop
 
 ```text
-Agent edits plugin server.ts/MyPanel.svelte
+Pi runs in Quincy's terminal panel
+→ agent edits plugin server.ts/MyPanel.svelte
 → `quincy plugin build`
+→ `quincy plugin test <id>`
 → `quincy plugin reload <id>`
 → server loads and validates backend candidate
 → server atomically activates candidate
@@ -179,17 +201,20 @@ Agent edits plugin server.ts/MyPanel.svelte
 
 Content hashes are required because browser ESM modules are cached. Vite HMR remains source-development mechanism; plugin reload is explicit production/runtime mechanism.
 
+The terminal-first loop is the self-extension UI: Pi edits files and invokes ordinary `quincy plugin build/test/reload` commands, while Quincy hosts, validates, and atomically activates the result. Quincy does not need a second transcript, prompt composer, tool renderer, or bespoke agent action protocol to support self-extension. Build, test, activation, and rollback diagnostics should be available through CLI output and the structured Quincy event/diagnostic surfaces.
+
 ## Agent bootstrap
 
 Provide:
 
 - built-in `quincy-plugin-authoring` skill documenting contracts, examples, build/test/reload flow, and security
-- `quincy plugin new`, `build`, `install`, `list`, `reload`, `disable`, and `remove` commands
-- agent-callable build/reload tools or CLI available through Pi bash
+- `quincy plugin new`, `build`, `test`, `install`, `list`, `reload`, `disable`, and `remove` commands
+- CLI available directly through Pi's native bash/tool workflow
 - example plugin serving as executable documentation
-- visible build/load diagnostics in existing agent/UI event stream
+- visible build/load diagnostics in CLI output and documented Quincy diagnostic events
+- bundled headless Pi extension that connects to the local authenticated bridge and publishes the narrow semantic event set
 
-For Pi-level extension, separately support trusted project `.pi/extensions` discovery and expose Pi runtime reload. Do not duplicate Pi agent lifecycle APIs in native Quincy plugin API.
+For Pi-level extension, separately support trusted project `.pi/extensions` discovery and Pi's native reload behavior. Do not duplicate Pi commands, transcript/session APIs, or lifecycle details in native Quincy plugin API. The bundled bridge is integration infrastructure, not a replacement agent runtime owned by Quincy.
 
 ## Security
 
@@ -208,12 +233,13 @@ Plugins are arbitrary code:
 
 1. Manifest/schema, discovery, trust, and server plugin registry.
 2. Lifecycle with candidate validation, disposal, atomic reload, and failure rollback.
-3. CLI scaffolding/build/install/reload commands.
+3. CLI scaffolding/build/test/install/reload commands and diagnostics.
 4. Browser inventory, UI slot registry, hashed ESM/CSS loader, and SSE reload notification.
-5. Convert repository-change graph into the first native plugin and remove its hard-coded page/layout wiring.
-6. Convert terminal workspace into a bundled native plugin.
-7. Add built-in authoring skill, examples, diagnostics, and tests.
-8. Add broader surfaces only from demonstrated plugin needs.
+5. Convert terminal workspace into a bundled native plugin and make Pi's CLI/TUI there the preferred agent UI; defer removal of the old Agent panel until equivalent required workflows are verified.
+6. Define the minimal `api.runs`/`api.workspace` semantic contracts and implement the bundled Pi bridge over a local authenticated structured channel.
+7. Convert repository-change graph into the first native plugin and remove its hard-coded page/layout wiring; use bridge events only where run/workspace semantics are required.
+8. Add built-in authoring skill, examples, diagnostics, and tests.
+9. Add broader surfaces only from demonstrated plugin needs.
 
 ## Acceptance Criteria
 
@@ -222,17 +248,20 @@ Plugins are arbitrary code:
 - Plugin can register at least one server contribution and cleanly dispose it.
 - Frontend plugin build compiles TypeScript/Svelte into content-hashed ESM and CSS.
 - Browser loads plugin inventory and renders at least one contribution in a documented UI slot.
-- Capability-specific API namespaces cover UI, commands, agents, RPC, events, storage, managed processes, and workspace access without exposing private host registries.
+- Capability-specific API namespaces cover UI, commands, runs, RPC, events, storage, managed processes, and workspace access without exposing private host registries.
 - Core remains usable with all native plugins disabled.
 - `ResponsiveWorkspaceLayout.svelte` and `apiRouter.ts` do not require feature-specific branches for plugin contributions.
 - Repository-change graph runs as a native plugin without direct imports from core page loading or workspace layout.
-- Terminal workspace runs as a bundled native plugin.
+- Terminal workspace runs as a bundled native plugin and hosts Pi's native CLI/TUI as the preferred agent interface.
+- Quincy does not require a separate Agent-panel transcript renderer, prompt composer, or Pi tool renderer for the terminal-first workflow.
+- A bundled headless Pi extension publishes the documented run started/settled, file mutation starting/completed, ticket/run association, and diagnostic semantics over a local authenticated structured channel.
+- Native plugins consume runtime-neutral `api.runs` and `api.workspace` hooks rather than raw Pi events or Pi session objects.
+- Pi remains usable through the terminal without the semantic bridge, with the documented limitation that run-aware native plugin features are unavailable.
 - Reload disposes old registrations and activates changed backend and frontend code without restarting Quincy.
 - Failed build/load/reload leaves previous working plugin active and exposes concise diagnostics.
 - Existing event hub/SSE notifies browser of plugin changes.
-- Agent can scaffold, build, install, and reload example plugin from a Quincy thread using documented commands/skill.
+- Agent can scaffold, build, test, install, and reload an example plugin from Pi in Quincy's terminal using documented CLI commands and authoring skill.
 - Project-local plugins require explicit trust; plugin provenance and full-trust implications are visible.
-- Pi extension responsibilities and native Quincy plugin responsibilities are documented separately.
-- Automated tests cover discovery, registration ownership, disposal, reload rollback, bundle hash changes, browser reconciliation, and trust rejection.
+- Pi extension/runtime responsibilities, the thin semantic bridge, and native Quincy plugin responsibilities are documented separately.
+- Automated tests cover discovery, registration ownership, disposal, reload rollback, bundle hash changes, browser reconciliation, trust rejection, bridge authentication, and Pi-to-Quincy semantic event adaptation.
 - `bun run check` and `bun run sensors all` pass.
-
