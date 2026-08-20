@@ -95,6 +95,18 @@ describe("terminal repository", () => {
     expect(repository.open()).toMatchObject({ status: "open", projectPath: "/repo/project" });
     expect(attempts).toBe(2);
   });
+
+  test("reports native PTY load errors instead of failing the terminal request", () => {
+    const repository = createTerminalRepository({
+      cwd: "/repo/project",
+      createSessionId: () => "terminal-1",
+      loadPty: () => {
+        throw new Error("Failed to load native module: pty.node");
+      },
+    });
+
+    expect(repository.open()).toMatchObject({ status: "error", message: "Terminal failed to open: Failed to load native module: pty.node" });
+  });
 });
 
 function createFakePty(): FakePty {

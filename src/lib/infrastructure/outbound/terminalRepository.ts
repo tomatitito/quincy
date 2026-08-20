@@ -1,4 +1,5 @@
-import * as pty from "node-pty";
+import { createRequire } from "node:module";
+import type * as pty from "node-pty";
 import type { ProjectPath } from "$lib/domain/ports";
 
 export type TerminalStatus = "opening" | "open" | "closed" | "error";
@@ -25,6 +26,7 @@ export interface TerminalRepository {
 interface TerminalRepositoryDependencies {
   cwd: ProjectPath;
   createSessionId: () => string;
+  loadPty?: () => Pick<typeof pty, "spawn">;
   spawnPty?: SpawnPty;
   shell?: string;
 }
@@ -54,6 +56,7 @@ interface TerminalSession {
 const DEFAULT_COLS = 80;
 const DEFAULT_ROWS = 24;
 const OUTPUT_LIMIT = 200_000;
+const require = createRequire(import.meta.url);
 
 // eslint-disable-next-line sensors/max-function-lines
 export function createTerminalRepository(dependencies: TerminalRepositoryDependencies): TerminalRepository {
@@ -93,11 +96,20 @@ function startSession(dependencies: TerminalRepositoryDependencies): TerminalSes
   const shell = dependencies.shell ?? process.env.SHELL ?? "/bin/sh";
   const initialState = createInitialState(dependencies);
   try {
-    const ptyProcess = (dependencies.spawnPty ?? pty.spawn)(shell, [], ptyOptions(dependencies.cwd, initialState));
+    const ptyProcess = loadSpawnPty(dependencies)(shell, [], ptyOptions(dependencies.cwd, initialState));
     return bindProcessEvents({ state: initialState, process: ptyProcess, disposables: [] }, ptyProcess);
   } catch (error) {
     return failedSession(initialState, error);
   }
+}
+
+function loadSpawnPty(dependencies: TerminalRepositoryDependencies): SpawnPty {
+  if (dependencies.spawnPty !== undefined) return dependencies.spawnPty;
+  return (dependencies.loadPty ?? loadNodePty)().spawn;
+}
+
+function loadNodePty(): Pick<typeof pty, "spawn"> {
+  return require("node-pty") as typeof pty;
 }
 
 function createInitialState(dependencies: TerminalRepositoryDependencies): TerminalState {

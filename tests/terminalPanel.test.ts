@@ -36,6 +36,7 @@ describe("Terminal workspace UI", () => {
 
   test("makes connection failures explicit and lets users reopen", () => {
     expect(panelSource).toContain("Terminal connection lost. Reopen to retry.");
+    expect(panelSource).toContain("Terminal request failed (${status}): ${body}");
     expect(panelSource).toContain('onclick={openTerminal}>Reopen</button>');
     expect(panelSource).toContain("terminal?.focus()");
   });

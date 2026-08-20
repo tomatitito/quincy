@@ -136,13 +136,19 @@
   }
 
   async function parseStateResponse(response: Response): Promise<TerminalState> {
-    if (!response.ok) return { status: "error", message: "Terminal request failed." };
+    if (!response.ok) return { status: "error", message: await terminalRequestError(response) };
     try {
       const value: unknown = await response.json();
       return parseTerminalState(value);
     } catch {
       return { status: "error", message: "Terminal response invalid." };
     }
+  }
+
+  async function terminalRequestError(response: Response): Promise<string> {
+    const body = (await response.text()).replace(/\s+/g, " ").trim().slice(0, 240);
+    const status = `${response.status}${response.statusText ? ` ${response.statusText}` : ""}`;
+    return body ? `Terminal request failed (${status}): ${body}` : `Terminal request failed (${status}).`;
   }
 
   function transportErrorState(): TerminalState {
