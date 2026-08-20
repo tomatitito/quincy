@@ -30,7 +30,7 @@ Two extension levels must remain explicit:
 1. Pi extensions extend agent behavior: tools, commands, prompts, lifecycle hooks, and model/session behavior.
 2. Native Quincy plugins extend Quincy application surfaces: Svelte UI, ticket actions, routes, services, storage, background work, semantic run/workspace reactions, and commands callable by users or agents.
 
-Implement native Quincy plugin API while reusing Pi extensions for agent-runtime-specific capabilities. Pi's CLI/TUI in the terminal is the preferred agent user interface; Quincy should not maintain a parallel Agent panel or transcript renderer. This replaces the presentation layer, not Quincy's semantic awareness of agent activity.
+Implement native Quincy plugin API while reusing Pi extensions for agent-runtime-specific capabilities. Pi's CLI/TUI in the terminal is the preferred agent user interface. Retain the parallel Agent panel until terminal-first Pi and the semantic bridge are verified, then retire its duplicated presentation in child ticket `qui-aret`. This replaces the presentation layer, not Quincy's semantic awareness of agent activity.
 
 ## Design
 
@@ -56,7 +56,7 @@ Move optional or volatile capabilities into native plugins:
 
 The ticket workflow stays in core initially because it defines Quincy and its parts co-evolve closely. Reconsider extracting it only if Quincy becomes a generic agent workspace rather than a markdown-ticket workbench.
 
-The custom Agent panel is not a core surface to preserve. The bundled terminal workspace should launch and host Pi's CLI/TUI as the primary interaction surface. Pi continues to own transcript rendering, model and session behavior, commands, prompts, tools, and native lifecycle details. Quincy should delete or retire duplicated Agent-panel presentation only as a separate implementation task; this ticket defines the target plugin platform and does not remove existing code.
+The custom Agent panel is not a long-term core surface to preserve. The bundled terminal workspace should launch and host Pi's CLI/TUI as the primary interaction surface. Pi continues to own transcript rendering, model and session behavior, commands, prompts, tools, and native lifecycle details. Quincy must keep the Agent panel available until child ticket `qui-aret`, whose dependencies and acceptance criteria require the replacement path to be verified before duplicated presentation is removed.
 
 `ResponsiveWorkspaceLayout.svelte` and `apiRouter.ts` must stop being feature switchboards. Core registries should render UI contributions and dispatch namespaced backend contributions without hard-coded imports or route branches for each plugin.
 
@@ -231,15 +231,23 @@ Plugins are arbitrary code:
 
 ## Suggested implementation order
 
-1. Manifest/schema, discovery, trust, and server plugin registry.
-2. Lifecycle with candidate validation, disposal, atomic reload, and failure rollback.
-3. CLI scaffolding/build/test/install/reload commands and diagnostics.
-4. Browser inventory, UI slot registry, hashed ESM/CSS loader, and SSE reload notification.
-5. Convert terminal workspace into a bundled native plugin and make Pi's CLI/TUI there the preferred agent UI; defer removal of the old Agent panel until equivalent required workflows are verified.
-6. Define the minimal `api.runs`/`api.workspace` semantic contracts and implement the bundled Pi bridge over a local authenticated structured channel.
-7. Convert repository-change graph into the first native plugin and remove its hard-coded page/layout wiring; use bridge events only where run/workspace semantics are required.
-8. Add built-in authoring skill, examples, diagnostics, and tests.
-9. Add broader surfaces only from demonstrated plugin needs.
+Ticket metadata is the source of truth for ordering. The thirteen migration stages map to real tickets as follows:
+
+1. `qui-ev2v` — make terminal-hosted Pi the primary workflow while retaining the Agent panel.
+2. `qui-sbrg` — add the authenticated Pi semantic bridge after terminal viability.
+3. `qui-pmft` — define manifest/schema, discovery, provenance, and trust; this can proceed in parallel with `qui-sbrg` after `qui-ev2v`.
+4. `qui-plcf` — add server candidate registration, ownership/disposal, atomic activation/reload, diagnostics, and rollback after `qui-pmft`.
+5. `qui-pcap` — add narrow commands, runs/workspace hooks, events, storage, RPC, and demonstrated managed-process capabilities; this joins `qui-sbrg` and `qui-plcf`.
+6. `qui-paut` — add plugin CLI/scaffolding/build/test/install/list/reload/disable/remove, authoring skill, and executable example.
+7. `qui-pweb` — add browser inventory/build/loading, content-hashed ESM/CSS, atomic browser swap, CSS disposal, and plugin-change notification.
+8. `qui-puis` — add migration-proven workspace/header/ticket-detail UI slots after server capabilities and browser loading.
+9. `qui-rchg` — migrate repository-change graph into the first substantial native plugin and remove hard-coded core wiring.
+10. `qui-tplg` — migrate terminal workspace into a trusted bundled plugin after the first native plugin proves the path.
+11. `qui-aret` — retire duplicated Agent-panel presentation only after `qui-sbrg` and `qui-tplg` complete and their replacement-path evidence is verified.
+12. `qui-1gtl` — implement the LSP architecture stress test once every platform capability it consumes is available; it can proceed in parallel with terminal migration and Agent-panel cleanup because it does not consume them.
+13. `qui-papi` — perform final API audit, versioning, and documentation stabilization after the repository graph, terminal, Agent-panel retirement, and LSP consumer.
+
+This is intentionally not a single chain: bridge and manifest work can proceed in parallel, and the LSP consumer does not wait on the unrelated terminal migration or Agent-panel cleanup. Transitive dependencies still make manifest/lifecycle and server/browser prerequisites visible in the graph.
 
 ## Acceptance Criteria
 

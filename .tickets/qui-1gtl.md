@@ -1,7 +1,7 @@
 ---
 id: qui-1gtl
 status: open
-deps: []
+deps: [qui-sbrg, qui-pcap, qui-paut, qui-pweb, qui-puis]
 links: []
 created: 2026-08-07T23:09:47Z
 type: feature
@@ -30,7 +30,7 @@ Explicitly defer business-workflow inference. LSP reports code structure and rel
 
 ## Dependency and role
 
-Implement as first substantial consumer of native plugin platform from parent epic `qui-dnab`. Plugin should validate plugin lifecycle, services, workspace/agent hooks, RPC/events, UI slots, storage, and reload behavior without reaching into Quincy internals.
+Implement as the architecture stress test for the native plugin platform from parent epic `qui-dnab`; the narrower repository graph migration remains the first planned native-plugin proof. Plugin should validate lifecycle, managed processes, runtime-neutral run/workspace hooks, RPC/events, commands, UI slots, storage, browser loading, and reload behavior without reaching into Quincy internals.
 
 ## Package shape
 
@@ -73,10 +73,10 @@ agent_start
 Quincy plugin API should expose semantic hooks rather than raw Pi event objects, for example:
 
 ```ts
-api.agents.onRunStarted(...)
+api.runs.onStarted(...)
 api.workspace.onFileMutationStarting(...)
 api.workspace.onFileMutationCompleted(...)
-api.agents.onRunSettled(...)
+api.runs.onSettled(...)
 ```
 
 A pre-mutation hook is necessary to preserve accurate baseline when worktree already contains unrelated dirty changes. Do not compare only against Git HEAD. Initial version may limit tracked mutations to Quincy/Pi write and edit tools; terminal/external-editor changes can be added later with watcher/snapshot strategy.
@@ -130,21 +130,21 @@ Server factory should approximately register:
 export default function register(api: QuincyServerPluginApi) {
   const service = new LspImpactService(api.workspace.root);
 
-  api.registerService({
+  api.processes.register({
     id: "lsp-impact",
     start: () => service.start(),
     stop: () => service.stop()
   });
 
-  api.agents.onRunStarted((run) => service.begin(run));
+  api.runs.onStarted((run) => service.begin(run));
   api.workspace.onFileMutationStarting((event) => service.captureBaseline(event));
   api.workspace.onFileMutationCompleted((event) => service.recordTouched(event));
-  api.agents.onRunSettled((run) => service.analyze(run));
+  api.runs.onSettled((run) => service.analyze(run));
 
-  api.registerRpc("lsp-impact/current", () => service.currentGraph());
-  api.registerAgentTool({
-    name: "query_code_impact",
-    description: "Return changed symbols, containing modules, references, callers, and callees for settled agent work",
+  api.rpc.register("current", () => service.currentGraph());
+  api.commands.register({
+    id: "query-code-impact",
+    title: "Query code impact",
     execute: (input) => service.query(input)
   });
 }
@@ -193,10 +193,9 @@ Create follow-up tickets only after MVP graph is evaluated.
 - Optional LSP features are capability-gated; unsupported/partial data does not fail whole analysis.
 - Traversal depth and node count are bounded.
 - Graph records provenance for relationships and does not label inferred business workflows as LSP facts.
-- Backend exposes current graph through plugin RPC and `query_code_impact` agent tool.
+- Backend exposes current graph through namespaced plugin RPC and a `query-code-impact` Quincy command callable from Pi through the documented command bridge.
 - Existing event/SSE mechanism notifies frontend after graph update.
 - Svelte plugin panel renders changed symbols and contextual dependency graph with useful loading, empty, partial, unsupported, and error states.
 - Tests cover settled-run timing, repeated mutations, dirty baseline, symbol classification, capability fallback, traversal limits, process disposal, and plugin reload.
 - Workflow inference and non-TypeScript languages remain out of scope.
 - `bun run check` and `bun run sensors all` pass.
-
